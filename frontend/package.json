@@ -1,0 +1,16 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build --mode production",
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@wailsio/runtime": "latest"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
