@@ -32,6 +32,10 @@
 
 ---
 
+## 截图
+
+![screenshot](screenshot.png)
+
 ## 怎么用
 
 1. 下载 [BiliQueue.exe](https://github.com/netsysn/bili-queue/releases)

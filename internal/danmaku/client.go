@@ -2,8 +2,11 @@ package danmaku
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 
@@ -45,6 +48,9 @@ func (c *Client) Connect() error {
 	if err != nil {
 		return fmt.Errorf("resolve room: %w", err)
 	}
+	// 连接后立即查一次 room_init 确定开播状态
+	c.checkLive(realID)
+
 	token := getToken(realID)
 
 	l := live.NewLive(false, 30*time.Second, 0, nil)
@@ -61,6 +67,7 @@ func (c *Client) Connect() error {
 		}
 	}()
 
+	lastCheck := time.Now()
 	for {
 		select {
 		case tp := <-l.Rev:
@@ -69,8 +76,17 @@ func (c *Client) Connect() error {
 			}
 			switch m := tp.Msg.(type) {
 			case *live.MsgHeartbeatReply:
+				// 每 60s 重新确认开播状态
+				if time.Since(lastCheck) > 60*time.Second {
+					c.checkLive(realID)
+					lastCheck = time.Now()
+				}
+			case *live.MsgLive:
 				SetLive(true)
+			case *live.MsgPreparing:
+				SetLive(false)
 			case *live.MsgDanmaku:
+				log.Printf("[WS] MsgDanmaku -> SetLive(true)")
 				SetLive(true)
 				dm, err := m.Parse()
 				if err != nil {
@@ -94,6 +110,26 @@ func (c *Client) Connect() error {
 			SetLive(false)
 			return nil
 		}
+	}
+}
+
+func (c *Client) checkLive(realID int64) {
+	api := fmt.Sprintf("https://api.live.bilibili.com/room/v1/Room/room_init?id=%d", realID)
+	req, _ := http.NewRequest("GET", api, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var r struct {
+		Data struct {
+			LiveStatus int `json:"live_status"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(body, &r) == nil {
+		SetLive(r.Data.LiveStatus == 1)
 	}
 }
 
