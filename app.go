@@ -236,10 +236,6 @@ func (s *AppService) buildUpdate() QueueUpdated {
 		}
 	}
 	isLive := danmaku.IsRoomLive()
-	if s.hist != nil {
-		hl, _ := s.hist.LiveStatus()
-		isLive = isLive || hl // WS 心跳优先，history API 兜底
-	}
 	return QueueUpdated{
 		Queue: qitems, Logs: litems,
 		IsLive: isLive, LiveTime: "",
