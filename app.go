@@ -13,18 +13,19 @@ import (
 )
 
 type QueueItem struct {
-	UID        int64  `json:"uid"`
-	Username   string `json:"username"`
-	Avatar     string `json:"avatar"`
-	Status     int    `json:"status"`
-	IsFirst    bool   `json:"is_first"`
-	HelpType   string `json:"help_type"`
-	Server     string `json:"server"`
-	Message    string `json:"message"`
-	JoinedAt   string `json:"joined_at"`
-	MedalName  string `json:"medal_name"`
-	MedalLevel int    `json:"medal_level"`
-	UserLevel  int    `json:"user_level"`
+	UID          int64  `json:"uid"`
+	Username     string `json:"username"`
+	Avatar       string `json:"avatar"`
+	Status       int    `json:"status"`
+	IsFirst      bool   `json:"is_first"`
+	HelpType     string `json:"help_type"`
+	Server       string `json:"server"`
+	Message      string `json:"message"`
+	JoinedAt     string `json:"joined_at"`
+	ElapsedSec   int    `json:"elapsed_sec"` // 已等待秒数，前端倒计时用
+	MedalName    string `json:"medal_name"`
+	MedalLevel   int    `json:"medal_level"`
+	UserLevel    int    `json:"user_level"`
 }
 
 type LogItem struct {
@@ -228,6 +229,7 @@ func (s *AppService) buildUpdate() QueueUpdated {
 			UID: e.UID, Username: e.Username, Avatar: e.Avatar, Status: int(e.Status),
 			IsFirst: isFirst, HelpType: e.HelpType, Server: e.Server,
 			Message: e.Message, JoinedAt: e.JoinedAt.Format("15:04:05"),
+			ElapsedSec: int(time.Since(e.JoinedAt).Seconds()),
 			MedalName: e.MedalName, MedalLevel: e.MedalLevel, UserLevel: e.UserLevel,
 		})
 	}
