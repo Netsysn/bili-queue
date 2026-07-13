@@ -43,6 +43,9 @@ type DanmakuLog struct {
 	MedalLevel  int       `json:"medal_level"`
 	UserLevel   int       `json:"user_level"`
 	ReplyTo     string    `json:"reply_to"`
+	IsGift      bool      `json:"is_gift"`
+	GiftName    string    `json:"gift_name"`
+	GiftNum     int       `json:"gift_num"`
 }
 
 type Manager struct {

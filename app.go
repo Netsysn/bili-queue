@@ -41,6 +41,9 @@ type LogItem struct {
 	MedalLevel  int    `json:"medal_level"`
 	UserLevel   int    `json:"user_level"`
 	ReplyTo     string `json:"reply_to"`
+	IsGift      bool   `json:"is_gift"`
+	GiftName    string `json:"gift_name"`
+	GiftNum     int    `json:"gift_num"`
 }
 
 type QueueUpdated struct {
@@ -166,6 +169,7 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 		HelpType: ht, Server: sv,
 		MedalName: msg.MedalName, MedalLevel: msg.MedalLevel,
 		UserLevel: msg.UserLevel,
+		IsGift: msg.IsGift, GiftName: msg.GiftName, GiftNum: msg.GiftNum,
 	})
 	if matched && msg.FromCurrent {
 		s.manager.Enqueue(msg.UID, msg.Username, avatar, ht, sv, msg.Content,
@@ -255,6 +259,7 @@ func (s *AppService) buildUpdate() QueueUpdated {
 			Content: l.Content, Time: l.Time.Format("15:04:05"),
 			IsQueue: l.IsQueue, FromCurrent: l.FromCurrent, IsFirstNew: isFirstNew,
 			MedalName: l.MedalName, MedalLevel: l.MedalLevel, UserLevel: l.UserLevel,
+			IsGift: l.IsGift, GiftName: l.GiftName, GiftNum: l.GiftNum,
 		}
 	}
 	isLive := danmaku.IsRoomLive()
