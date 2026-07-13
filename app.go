@@ -43,10 +43,11 @@ type LogItem struct {
 }
 
 type QueueUpdated struct {
-	Queue    []QueueItem `json:"queue"`
-	Logs     []LogItem   `json:"logs"`
-	IsLive   bool        `json:"is_live"`
-	LiveTime string      `json:"live_time"`
+	Queue          []QueueItem `json:"queue"`
+	Logs           []LogItem   `json:"logs"`
+	IsLive         bool        `json:"is_live"`
+	LiveTime       string      `json:"live_time"`
+	TimeoutMinutes int         `json:"timeout_minutes"`
 }
 
 type AppService struct {
@@ -247,9 +248,11 @@ func (s *AppService) buildUpdate() QueueUpdated {
 		}
 	}
 	isLive := danmaku.IsRoomLive()
+	cfg := getConfig()
 	return QueueUpdated{
 		Queue: qitems, Logs: litems,
 		IsLive: isLive, LiveTime: "",
+		TimeoutMinutes: cfg.TimeoutMinutes,
 	}
 }
 

@@ -225,9 +225,19 @@ func (m *Manager) checkTimeout() {
 	changed := false
 	threshold := time.Duration(m.timeoutMinutes) * time.Minute
 	for i := range m.items {
-		if m.items[i].Status == StatusInProgress && time.Since(m.items[i].JoinedAt) > threshold {
+		// 等待中可超时，进行中保护（主播正在服务不超时）
+		if m.items[i].Status == StatusActive && time.Since(m.items[i].JoinedAt) > threshold {
 			m.items[i].Status = StatusTimeout
+			// 移到最后
+			entry := m.items[i]
+			m.items = append(m.items[:i], m.items[i+1:]...)
+			m.items = append(m.items, entry)
+			// 重建索引
+			for j := range m.items {
+				m.uidSet[m.items[j].UID] = j
+			}
 			changed = true
+			break // 一次只处理一个
 		}
 	}
 	m.mu.Unlock()
