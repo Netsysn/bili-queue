@@ -2,6 +2,7 @@ import { Window, Events, Call } from '@wailsio/runtime';
 
 const SVC = 'main.AppService';
 let timeoutIdx = -1;
+let timeoutMins = 5;
 let currentTab = 'queue';
 
 function av(name) {
