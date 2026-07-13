@@ -215,13 +215,21 @@ func (s *AppService) buildUpdate() QueueUpdated {
 	logs := s.manager.Logs()
 
 	qitems := make([]QueueItem, 0, len(entries))
+	// 检查是否有进行中——如果有，后面的都不标"等待"
+	hasInProgress := false
+	for _, e := range entries {
+		if e.Status == queue.StatusInProgress {
+			hasInProgress = true
+			break
+		}
+	}
 	firstFound := false
 	for _, e := range entries {
 		if e.Status == queue.StatusDone {
 			continue
 		}
 		isFirst := false
-		if !firstFound && e.Status == queue.StatusActive {
+		if !firstFound && e.Status == queue.StatusActive && !hasInProgress {
 			isFirst = true
 			firstFound = true
 		}
