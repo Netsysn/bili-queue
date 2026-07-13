@@ -24,7 +24,9 @@ type DanmakuMsg struct {
 	MedalLevel  int
 	UserLevel   int
 	Vip         int
-	ReplyTo     string // @回复的用户名
+	IsGift      bool
+	GiftName    string
+	GiftNum     int
 }
 
 type Client struct {
@@ -48,7 +50,6 @@ func (c *Client) Connect() error {
 	if err != nil {
 		return fmt.Errorf("resolve room: %w", err)
 	}
-	// 连接后立即查一次 room_init 确定开播状态
 	c.checkLive(realID)
 
 	token := getToken(realID)
@@ -76,7 +77,6 @@ func (c *Client) Connect() error {
 			}
 			switch m := tp.Msg.(type) {
 			case *live.MsgHeartbeatReply:
-				// 每 60s 重新确认开播状态
 				if time.Since(lastCheck) > 60*time.Second {
 					c.checkLive(realID)
 					lastCheck = time.Now()
@@ -85,8 +85,21 @@ func (c *Client) Connect() error {
 				SetLive(true)
 			case *live.MsgPreparing:
 				SetLive(false)
+			case *live.MsgSendGift:
+				SetLive(true)
+				g, err := m.Parse()
+				if err == nil {
+					select {
+					case c.msgCh <- DanmakuMsg{
+						UID: 0, Username: g.Uname,
+						Content: fmt.Sprintf("送出 %s x%d", g.GiftName, g.Num),
+						FromCurrent: true, IsGift: true,
+						GiftName: g.GiftName, GiftNum: g.Num,
+					}:
+					default:
+					}
+				}
 			case *live.MsgDanmaku:
-				log.Printf("[WS] MsgDanmaku -> SetLive(true)")
 				SetLive(true)
 				dm, err := m.Parse()
 				if err != nil {

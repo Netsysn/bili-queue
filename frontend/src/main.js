@@ -90,7 +90,7 @@ function renderLogs(items) {
     }
 
     const div = document.createElement('div');
-    div.className = 'd-item' + (item.is_queue ? ' queue' : '');
+    div.className = 'd-item' + (item.is_queue ? ' queue' : '') + (item.is_gift ? ' gift' : '');
     const face = item.avatar ? `<img src="${item.avatar.replace(/"/g,'&quot;')}" referrerpolicy="no-referrer" style="width:20px;height:20px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">` : `<div class="d-avatar">${av(item.username)}</div>`;
     let badges = '';
     if (item.medal_name) badges += `<span style="background:rgba(52,211,153,0.10);color:#34d399;font-size:8px;padding:1px 4px;border-radius:2px;margin-left:3px">${esc(item.medal_name)} ${item.medal_level}</span>`;
