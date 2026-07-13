@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"strings"
 	"time"
 
 	"bili-queue-overlay/internal/danmaku"
@@ -42,6 +43,7 @@ type LogItem struct {
 	UserLevel   int    `json:"user_level"`
 	ReplyTo     string `json:"reply_to"`
 	IsGift      bool   `json:"is_gift"`
+	HasMedal    bool   `json:"has_medal"` // 有当前直播间粉丝勋章=可插队
 	GiftName    string `json:"gift_name"`
 	GiftNum     int    `json:"gift_num"`
 }
@@ -175,6 +177,16 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 		s.manager.Enqueue(msg.UID, msg.Username, avatar, ht, sv, msg.Content,
 			msg.MedalName, msg.MedalLevel, msg.UserLevel)
 	}
+	// 礼物插队：送了配置的礼物直接入队
+	if msg.IsGift && msg.FromCurrent {
+		for _, gk := range cfg.GiftQueue {
+			if strings.EqualFold(msg.GiftName, gk) {
+				s.manager.Enqueue(msg.UID, msg.Username, avatar, "礼物插队", "", msg.Content,
+					msg.MedalName, msg.MedalLevel, msg.UserLevel)
+				break
+			}
+		}
+	}
 }
 
 func (s *AppService) GetQueue() QueueUpdated { return s.buildUpdate() }
@@ -211,6 +223,7 @@ func (s *AppService) SaveConfig(c Config) {
 		cfg.WindowOpacity = c.WindowOpacity
 		if len(c.HelpTypes) > 0 { cfg.HelpTypes = c.HelpTypes }
 		if len(c.Servers) > 0   { cfg.Servers = c.Servers }
+		if len(c.GiftQueue) > 0 { cfg.GiftQueue = c.GiftQueue }
 	})
 }
 
