@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -8,9 +9,10 @@ import (
 type Status int
 
 const (
-	StatusActive  Status = iota
-	StatusDone
-	StatusTimeout
+	StatusActive     Status = iota // 排队中
+	StatusInProgress               // 进行中（主播正在服务）
+	StatusDone                     // 已完成
+	StatusTimeout                  // 超时
 )
 
 type Entry struct {
@@ -100,7 +102,7 @@ func (m *Manager) Enqueue(uid int64, username, avatar, helpType, server, message
 func (m *Manager) Complete() {
 	m.mu.Lock()
 	for i := range m.items {
-		if m.items[i].Status == StatusActive {
+		if m.items[i].Status == StatusInProgress {
 			uid := m.items[i].UID
 			delete(m.uidSet, uid)
 			m.items = append(m.items[:i], m.items[i+1:]...)
@@ -112,6 +114,37 @@ func (m *Manager) Complete() {
 	}
 	m.mu.Unlock()
 	m.emitSafe()
+}
+
+// Start 将第一个排队中的人标为进行中。返回错误如果已有人进行中。
+func (m *Manager) Start() error {
+	m.mu.Lock()
+	hasInProgress := false
+	for _, it := range m.items {
+		if it.Status == StatusInProgress {
+			hasInProgress = true
+			break
+		}
+	}
+	if hasInProgress {
+		m.mu.Unlock()
+		return fmt.Errorf("请先完成当前进行中的任务")
+	}
+	found := false
+	for i := range m.items {
+		if m.items[i].Status == StatusActive {
+			m.items[i].Status = StatusInProgress
+			m.items[i].JoinedAt = time.Now()
+			found = true
+			break
+		}
+	}
+	m.mu.Unlock()
+	if found {
+		m.emitSafe()
+		return nil
+	}
+	return fmt.Errorf("没有排队中的人")
 }
 
 func (m *Manager) Skip() {
@@ -191,14 +224,10 @@ func (m *Manager) checkTimeout() {
 	m.mu.Lock()
 	changed := false
 	threshold := time.Duration(m.timeoutMinutes) * time.Minute
-	count := 0
 	for i := range m.items {
-		if m.items[i].Status == StatusActive {
-			if count < 3 && time.Since(m.items[i].JoinedAt) > threshold {
-				m.items[i].Status = StatusTimeout
-				changed = true
-			}
-			count++
+		if m.items[i].Status == StatusInProgress && time.Since(m.items[i].JoinedAt) > threshold {
+			m.items[i].Status = StatusTimeout
+			changed = true
 		}
 	}
 	m.mu.Unlock()
