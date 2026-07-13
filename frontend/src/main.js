@@ -39,7 +39,7 @@ function renderQueue(items) {
     else if (item.status === 1) tag = '<span class="q-tag tag-current">进行中</span>';
     else if (item.is_first) {
       // 计算倒计时
-      const elapsed = Math.floor((Date.now() - new Date(item.joined_at).getTime()) / 1000);
+      const elapsed = item.elapsed_sec || 0;
       const remain = Math.max(0, timeoutMins * 60 - elapsed);
       const m = Math.floor(remain / 60), s = remain % 60;
       tag = `<span class="q-tag tag-current">等待 ${m}:${String(s).padStart(2,'0')}</span>`;
@@ -239,7 +239,7 @@ window.saveSettings = async () => {
   document.getElementById('statusText').textContent = '加载中...';
   try {
     const data = await Call.ByName(SVC + '.GetQueue');
-    console.log('[FE] init: isLive=' + data.is_live + ' q=' + (data.queue||[]).length + ' l=' + (data.logs||[]).length);
+    if (data.timeout_minutes) timeoutMins = data.timeout_minutes;
     renderQueue(data.queue || []);
     renderLogs(data.logs || []);
     updateLiveStatus(data.is_live, data.live_time);
