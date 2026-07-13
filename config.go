@@ -15,7 +15,8 @@ type Config struct {
 	WindowOpacity  float64  `json:"window_opacity"`
 	HelpTypes      []string `json:"help_types"`
 	Servers        []string `json:"servers"`
-	GiftQueue      []string `json:"gift_queue"` // 送这些礼物直接入队（付费插队）
+	PayMode        bool     `json:"pay_mode"`   // 付费模式：仅送礼可入队
+	GiftQueue      []string `json:"gift_queue"` // 付费模式下的有效礼物
 }
 
 var defaultConfig = Config{

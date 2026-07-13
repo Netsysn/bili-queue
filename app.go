@@ -153,7 +153,7 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 
 	cfg := getConfig()
 	ht, sv, matched := "", "", false
-	if msg.FromCurrent {
+	if msg.FromCurrent && !cfg.PayMode {
 		ht, sv, matched = intent.Match(msg.Content, cfg.HelpTypes, cfg.Servers)
 	}
 	if matched && sv == "" {
@@ -221,6 +221,7 @@ func (s *AppService) SaveConfig(c Config) {
 		cfg.RoomID = c.RoomID
 		cfg.TimeoutMinutes = c.TimeoutMinutes
 		cfg.WindowOpacity = c.WindowOpacity
+		cfg.PayMode = c.PayMode
 		if len(c.HelpTypes) > 0 { cfg.HelpTypes = c.HelpTypes }
 		if len(c.Servers) > 0   { cfg.Servers = c.Servers }
 		if len(c.GiftQueue) > 0 { cfg.GiftQueue = c.GiftQueue }
