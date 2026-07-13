@@ -51,7 +51,6 @@ func (c *Client) Connect() error {
 		return fmt.Errorf("resolve room: %w", err)
 	}
 	c.checkLive(realID)
-
 	token := getToken(realID)
 
 	l := live.NewLive(false, 30*time.Second, 0, nil)
@@ -61,7 +60,6 @@ func (c *Client) Connect() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	go func() {
 		if err := l.Enter(ctx, realID, token, 0); err != nil {
 			log.Printf("danmaku enter: %v", err)
@@ -69,12 +67,14 @@ func (c *Client) Connect() error {
 	}()
 
 	lastCheck := time.Now()
+	msgCount := 0
 	for {
 		select {
 		case tp := <-l.Rev:
 			if tp.Error != nil {
 				continue
 			}
+			msgCount++
 			switch m := tp.Msg.(type) {
 			case *live.MsgHeartbeatReply:
 				if time.Since(lastCheck) > 60*time.Second {
@@ -89,6 +89,7 @@ func (c *Client) Connect() error {
 				SetLive(true)
 				g, err := m.Parse()
 				if err == nil {
+					log.Printf("[WS] Gift: %s %s x%d", g.Uname, g.GiftName, g.Num)
 					select {
 					case c.msgCh <- DanmakuMsg{
 						UID: 0, Username: g.Uname,
@@ -117,6 +118,41 @@ func (c *Client) Connect() error {
 					UserLevel: dm.UserLevel, Vip: dm.Vip,
 				}:
 				default:
+				}
+			default:
+				// 库不识别的消息类型，尝试从 raw JSON 提取礼物信息
+				if gm, ok := tp.Msg.(*live.MsgGeneral); ok {
+					data := gm.Raw()
+					var gift struct {
+						Cmd  string `json:"cmd"`
+						Data struct {
+							Uname    string `json:"uname"`
+							GiftName string `json:"giftName"`
+							Num      int    `json:"num"`
+							Action   string `json:"action"`
+						} `json:"data"`
+					}
+					if json.Unmarshal(data, &gift) == nil && gift.Cmd != "" {
+						if strings.Contains(gift.Cmd, "GIFT") || gift.Data.GiftName != "" {
+							SetLive(true)
+							name := gift.Data.Uname
+							gname := gift.Data.GiftName
+							n := gift.Data.Num
+							if n == 0 { n = 1 }
+							log.Printf("[WS] Gift(raw): %s %s x%d (cmd=%s)", name, gname, n, gift.Cmd)
+							select {
+							case c.msgCh <- DanmakuMsg{
+								Username: name, Content: fmt.Sprintf("送出 %s x%d", gname, n),
+								FromCurrent: true, IsGift: true,
+								GiftName: gname, GiftNum: n,
+							}:
+							default:
+							}
+						}
+					}
+				}
+				if msgCount <= 20 {
+					log.Printf("[WS] OTHER: %T", m)
 				}
 			}
 		case <-c.stopCh:

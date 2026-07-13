@@ -9,12 +9,13 @@ import (
 
 // Config 应用配置。
 type Config struct {
-	Theme          string   `json:"theme"`           // "dark" | "light"
-	RoomID         int64    `json:"room_id"`          // 直播间房间号
-	TimeoutMinutes int      `json:"timeout_minutes"`  // 超时分钟数
-	WindowOpacity  float64  `json:"window_opacity"`   // 0.5 ~ 1.0
-	HelpTypes      []string `json:"help_types"`       // 帮类型: ["排队","帮帮","带带"]
-	Servers        []string `json:"servers"`          // 服务器: ["B服","官服"]
+	Theme          string   `json:"theme"`
+	RoomID         int64    `json:"room_id"`
+	TimeoutMinutes int      `json:"timeout_minutes"`
+	WindowOpacity  float64  `json:"window_opacity"`
+	HelpTypes      []string `json:"help_types"`
+	Servers        []string `json:"servers"`
+	GiftQueue      []string `json:"gift_queue"` // 送这些礼物直接入队（付费插队）
 }
 
 var defaultConfig = Config{
@@ -24,6 +25,7 @@ var defaultConfig = Config{
 	WindowOpacity:  0.92,
 	HelpTypes:      []string{"排队", "帮帮", "带带", "求带", "上车"},
 	Servers:        []string{"B服", "官服"},
+	GiftQueue:      []string{"贴贴", "粉丝团灯牌", "小花花"},
 }
 
 var (

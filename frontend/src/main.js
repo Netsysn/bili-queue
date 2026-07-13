@@ -191,6 +191,7 @@ window.showSettings = async () => {
     document.getElementById('cfgTimeout').value = c.timeout_minutes;
     initTags('tagHelpTypes', c.help_types||[]);
     initTags('tagServers', c.servers||[]);
+    initTags('tagGifts', c.gift_queue||[]);
     document.getElementById('cfgOpacity').value = Math.round((c.window_opacity||0.92)*100);
     document.getElementById('cfgOpacityVal').textContent = Math.round((c.window_opacity||0.92)*100)+'%';
   } catch(e) {}
@@ -220,6 +221,7 @@ window.saveSettings = async () => {
     window_opacity: parseInt(document.getElementById('cfgOpacity').value) / 100,
     help_types: getTags('tagHelpTypes'),
     servers: getTags('tagServers'),
+    gift_queue: getTags('tagGifts'),
   };
   await Call.ByName(SVC + '.SaveConfig', c);
   hideSettings();
