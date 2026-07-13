@@ -187,6 +187,7 @@ window.showSettings = async () => {
   try {
     const c = await Call.ByName(SVC + '.GetConfig');
     document.getElementById('cfgTheme').checked = c.theme === 'light';
+    document.getElementById('cfgPayMode').checked = c.pay_mode || false;
     document.getElementById('cfgRoom').value = c.room_id;
     document.getElementById('cfgTimeout').value = c.timeout_minutes;
     initTags('tagHelpTypes', c.help_types||[]);
@@ -217,6 +218,7 @@ window.saveSettings = async () => {
   const c = {
     theme: document.getElementById('cfgTheme').checked ? 'light' : 'dark',
     room_id: parseInt(document.getElementById('cfgRoom').value) || 1926788042,
+    pay_mode: document.getElementById('cfgPayMode').checked,
     timeout_minutes: parseInt(document.getElementById('cfgTimeout').value) || 5,
     window_opacity: parseInt(document.getElementById('cfgOpacity').value) / 100,
     help_types: getTags('tagHelpTypes'),
