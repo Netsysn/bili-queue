@@ -59,6 +59,16 @@
   .tag-current { background:rgba(167,139,250,0.14); color:var(--accent); }
   .tag-wait { color:var(--text-muted); }
   .tag-timeout { background:rgba(251,191,36,0.10); color:var(--warn); }
+  .q-start-btn { opacity:0; transform:translateX(4px); transition:all 0.2s ease; padding:2px 8px; border-radius:4px; border:1px solid var(--accent); background:rgba(167,139,250,0.12); color:var(--accent); font-size:10px; cursor:pointer; flex-shrink:0; font-family:inherit; }
+  .q-item:hover .q-start-btn { opacity:1; transform:translateX(0); }
+  .q-start-btn:hover { background:var(--accent); color:white; transform:scale(1.05); }
+  .q-start-btn:active { transform:scale(0.95); }
+
+  @keyframes fadeSlideIn {
+    from { opacity:0; transform:translateY(-6px); }
+    to { opacity:1; transform:translateY(0); }
+  }
+  .q-item { animation: fadeSlideIn 0.3s ease; }
 
   /* ── 弹幕日志项 ── */
   .d-item { display:flex; align-items:flex-start; gap:8px; padding:6px 8px; border-radius:4px; font-size:10px; border-left:2px solid transparent; animation:slideIn 0.2s ease; }
@@ -146,7 +156,8 @@
     <span style="font-size:9px;color:var(--text-dim);font-weight:400">by netsysn</span>
   </div>
   <div class="titlebar-right">
-    <button class="titlebar-btn" style="--wails-draggable:no-drag" onclick="refreshDanmaku()" title="刷新弹幕">
+    <button class="titlebar-btn" style="--wails-draggable:no-drag" onclick="testData()" title="测试数据">T</button>
+<button class="titlebar-btn" style="--wails-draggable:no-drag" onclick="refreshDanmaku()" title="刷新弹幕">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
     </button>
     <button class="titlebar-btn" style="--wails-draggable:no-drag" onclick="showSettings()" title="设置">

@@ -10,7 +10,8 @@ var denyPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`[怎咋哪]`),
 	regexp.MustCompile(`\?|？`),
 	regexp.MustCompile(`吗`),
-	regexp.MustCompile(`[这那].{3,6}排`), // "这么牛逼的排队"，留 0-2 字不杀（如"那排队"可能真排队）
+	regexp.MustCompile(`[这那][^排]{3,6}排`), // "这么牛逼的排队"，中间不能含"排"，不杀"那我排一排"
+	regexp.MustCompile(`排队.{0,3}(真|太|烂)`), // "排队系统真烂"
 	regexp.MustCompile(`如何`),
 	regexp.MustCompile(`什么`),
 	regexp.MustCompile(`多少|几个|多久`),
@@ -61,11 +62,24 @@ func isNegative(text string) bool {
 }
 
 // matchOne 在文本中查找第一个匹配的关键词，返回原始配置值。
+// 帮类型模糊匹配变体
+var fuzzyMap = map[string]*regexp.Regexp{
+	"排队": regexp.MustCompile(`排[个一队].|排一排|排一下|排了`),
+	"帮帮": regexp.MustCompile(`帮[帮我].|帮一下|帮个忙`),
+	"带带": regexp.MustCompile(`带[带我].|带一下|带个`),
+	"上车": regexp.MustCompile(`上[车船]`),
+}
+
 func matchOne(text string, keywords []string) string {
 	lower := strings.ToLower(text)
 	for _, kw := range keywords {
+		// 精确子串
 		if strings.Contains(lower, strings.ToLower(kw)) {
-			return kw // 返回原始大小写
+			return kw
+		}
+		// 模糊变体
+		if re, ok := fuzzyMap[kw]; ok && re.MatchString(text) {
+			return kw
 		}
 	}
 	return ""

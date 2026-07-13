@@ -31,16 +31,22 @@ function renderQueue(items) {
     const div = document.createElement('div');
     div.className = 'q-item';
     if (item.is_first) div.classList.add('current');
-    if (item.status === 2) { div.classList.add('timed-out'); timeoutIdx = idx; }
+    if (item.status === 3) { div.classList.add('timed-out'); timeoutIdx = idx; }
 
     let tag = '<span class="q-tag tag-wait">排队中</span>';
-    if (item.status === 2) tag = '<span class="q-tag tag-timeout">超时</span>';
-    else if (item.is_first) tag = '<span class="q-tag tag-current">当前</span>';
+    if (item.status === 3) tag = '<span class="q-tag tag-timeout">超时</span>';
+    else if (item.status === 1) tag = '<span class="q-tag tag-current">进行中</span>';
+    else if (item.is_first) tag = '<span class="q-tag tag-current">等待</span>';
 
     const face = item.avatar ? `<img src="${item.avatar.replace(/"/g,'&quot;')}" referrerpolicy="no-referrer" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">` : `<div class="q-avatar">${av(item.username)}</div>`;
     let badges = '';
     if (item.medal_name) badges += `<span style="background:rgba(52,211,153,0.12);color:#34d399;font-size:8px;padding:1px 4px;border-radius:3px;margin-left:4px">${esc(item.medal_name)} ${item.medal_level}</span>`;
     if (item.user_level > 0) badges += `<span style="background:rgba(251,191,36,0.12);color:#fbbf24;font-size:8px;padding:1px 4px;border-radius:3px;margin-left:3px">UL${item.user_level}</span>`;
+    // 排队第一个且不是进行中 → hover 显示开始按钮
+    let startBtn = '';
+    if (item.is_first && item.status === 0) {
+      startBtn = `<button class="q-start-btn" onclick="startFirst()" title="开始服务">开始</button>`;
+    }
     div.innerHTML = `
       ${face}
       <div class="q-info">
@@ -48,7 +54,8 @@ function renderQueue(items) {
         <div class="q-meta"><span class="ht">${esc(item.help_type||'')}</span> ${esc(item.server||'')}</div>
       </div>
       <span class="q-time">${fmtTime(item.joined_at)}</span>
-      ${tag}`;
+      ${tag}
+      ${startBtn}`;
     page.appendChild(div);
   });
 }
@@ -107,9 +114,18 @@ window.switchTab = (tab) => {
 window.act = (method) => Call.ByName(SVC + '.' + method);
 window.restoreTimeout = () => { if (timeoutIdx >= 0) Call.ByName(SVC + '.Restore', timeoutIdx); };
 
+window.startFirst = async () => {
+  const r = await Call.ByName(SVC + '.Start');
+  if (r) {
+    document.getElementById('statusText').textContent = r;
+    setTimeout(() => { document.getElementById('statusText').textContent = '监听中'; }, 3000);
+  }
+};
+
 document.addEventListener('keydown', (e) => {
   if (!e.ctrlKey) return;
   switch (e.key.toLowerCase()) {
+    case 'b': startFirst(); break;
     case 'e': act('Complete'); break;
     case 's': act('Skip'); break;
     case 'r': restoreTimeout(); break;
@@ -126,6 +142,9 @@ window.refreshDanmaku = () => {
   Call.ByName(SVC + '.Refresh');
   document.getElementById('statusText').textContent = '刷新中...';
   setTimeout(() => { document.getElementById('statusText').textContent = '监听中'; }, 2000);
+};
+window.testData = () => {
+  Call.ByName(SVC + '.TestData');
 };
 window.minimizeWin = () => Window.Minimise();
 
