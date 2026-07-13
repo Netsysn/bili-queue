@@ -36,7 +36,13 @@ function renderQueue(items) {
     let tag = '<span class="q-tag tag-wait">排队中</span>';
     if (item.status === 3) tag = '<span class="q-tag tag-timeout">超时</span>';
     else if (item.status === 1) tag = '<span class="q-tag tag-current">进行中</span>';
-    else if (item.is_first) tag = '<span class="q-tag tag-current">等待</span>';
+    else if (item.is_first) {
+      // 计算倒计时
+      const elapsed = Math.floor((Date.now() - new Date(item.joined_at).getTime()) / 1000);
+      const remain = Math.max(0, timeoutMins * 60 - elapsed);
+      const m = Math.floor(remain / 60), s = remain % 60;
+      tag = `<span class="q-tag tag-current">等待 ${m}:${String(s).padStart(2,'0')}</span>`;
+    }
 
     const face = item.avatar ? `<img src="${item.avatar.replace(/"/g,'&quot;')}" referrerpolicy="no-referrer" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">` : `<div class="q-avatar">${av(item.username)}</div>`;
     let badges = '';
@@ -244,7 +250,8 @@ window.saveSettings = async () => {
 
 // 监听更新
 Events.On('queue:updated', (event) => {
-  const data = event.data; // Wails v3 事件包在 {name, data} 里
+  const data = event.data;
+  if (data && data.timeout_minutes) timeoutMins = data.timeout_minutes;
   renderQueue((data && data.queue) || []);
   renderLogs((data && data.logs) || []);
   updateLiveStatus(data && data.is_live, data && data.live_time);
