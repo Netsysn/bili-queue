@@ -3,15 +3,14 @@ module bili-queue-overlay
 go 1.25.0
 
 require (
+	github.com/andybalholm/brotli v1.0.3
 	github.com/gorilla/websocket v1.5.3
-	github.com/iyear/biligo-live v0.1.5
 	github.com/wailsapp/wails/v3 v3.0.0-alpha2.117
 	golang.org/x/sys v0.43.0
 )
 
 require (
 	github.com/adrg/xdg v0.5.3 // indirect
-	github.com/andybalholm/brotli v1.0.3 // indirect
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
