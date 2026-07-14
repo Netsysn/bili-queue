@@ -67,14 +67,12 @@ func (c *Client) Connect() error {
 	}()
 
 	lastCheck := time.Now()
-	msgCount := 0
 	for {
 		select {
 		case tp := <-l.Rev:
 			if tp.Error != nil {
 				continue
 			}
-			msgCount++
 			switch m := tp.Msg.(type) {
 			case *live.MsgHeartbeatReply:
 				if time.Since(lastCheck) > 60*time.Second {
@@ -89,11 +87,10 @@ func (c *Client) Connect() error {
 				SetLive(true)
 				g, err := m.Parse()
 				if err == nil {
-					log.Printf("[WS] Gift: %s %s x%d", g.Uname, g.GiftName, g.Num)
+					log.Printf("[WS] SendGift: %s %s x%d", g.Uname, g.GiftName, g.Num)
 					select {
 					case c.msgCh <- DanmakuMsg{
-						UID: 0, Username: g.Uname,
-						Content: fmt.Sprintf("送出 %s x%d", g.GiftName, g.Num),
+						Username: g.Uname, Content: fmt.Sprintf("送出 %s x%d", g.GiftName, g.Num),
 						FromCurrent: true, IsGift: true,
 						GiftName: g.GiftName, GiftNum: g.Num,
 					}:
@@ -120,48 +117,62 @@ func (c *Client) Connect() error {
 				default:
 				}
 			default:
-				// 库不识别的消息类型，尝试从 raw JSON 提取礼物信息
+				// MsgGeneral 兜底：解析 SEND_GIFT（data 是转义 JSON 字符串）
 				if gm, ok := tp.Msg.(*live.MsgGeneral); ok {
-					data := gm.Raw()
-					var gift struct {
-						Cmd  string `json:"cmd"`
-						Data struct {
-							Uname    string `json:"uname"`
-							GiftName string `json:"giftName"`
-							Num      int    `json:"num"`
-							Action   string `json:"action"`
-							UID      int64  `json:"uid"`
-							Face     string `json:"face"`
-						} `json:"data"`
-					}
-					if json.Unmarshal(data, &gift) == nil && gift.Cmd != "" {
-						log.Printf("[WS] Raw gift data: cmd=%s uname=%s gift=%s num=%d uid=%d", gift.Cmd, gift.Data.Uname, gift.Data.GiftName, gift.Data.Num, gift.Data.UID)
-						if strings.Contains(gift.Cmd, "GIFT") || gift.Data.GiftName != "" {
-							SetLive(true)
-							name := gift.Data.Uname
-							gname := gift.Data.GiftName
-							n := gift.Data.Num
-							if n == 0 { n = 1 }
-							log.Printf("[WS] Gift(raw): uid=%d %s %s x%d (cmd=%s)", gift.Data.UID, name, gname, n, gift.Cmd)
-							select {
-							case c.msgCh <- DanmakuMsg{
-								UID: gift.Data.UID, Username: name, Content: fmt.Sprintf("送出 %s x%d", gname, n),
-								FromCurrent: true, IsGift: true,
-								GiftName: gname, GiftNum: n,
-							}:
-							default:
-							}
-						}
-					}
-				}
-				if msgCount <= 20 {
-					log.Printf("[WS] OTHER: %T", m)
+					c.parseRawGift(gm.Raw())
 				}
 			}
 		case <-c.stopCh:
 			SetLive(false)
 			return nil
 		}
+	}
+}
+
+// parseRawGift 解析 MsgGeneral 中的 SEND_GIFT。
+// B站协议中 data 字段是转义 JSON 字符串，需二次解析。
+func (c *Client) parseRawGift(raw []byte) {
+	var outer struct {
+		Cmd  string          `json:"cmd"`
+		Data json.RawMessage `json:"data"`
+	}
+	if json.Unmarshal(raw, &outer) != nil {
+		return
+	}
+	if !strings.Contains(outer.Cmd, "GIFT") {
+		return
+	}
+
+	var gd struct {
+		Uname    string `json:"uname"`
+		GiftName string `json:"giftName"`
+		Num      int    `json:"num"`
+		UID      int64  `json:"uid"`
+	}
+	// 先当对象解析
+	if json.Unmarshal(outer.Data, &gd) != nil {
+		// 可能是转义字符串，解析 string 再解析 JSON
+		var str string
+		if json.Unmarshal(outer.Data, &str) == nil {
+			json.Unmarshal([]byte(str), &gd)
+		}
+	}
+	if gd.GiftName == "" {
+		return
+	}
+	SetLive(true)
+	if gd.Num == 0 {
+		gd.Num = 1
+	}
+	log.Printf("[WS] Gift(raw): uid=%d %s %s x%d", gd.UID, gd.Uname, gd.GiftName, gd.Num)
+	select {
+	case c.msgCh <- DanmakuMsg{
+		UID: gd.UID, Username: gd.Uname,
+		Content:     fmt.Sprintf("送出 %s x%d", gd.GiftName, gd.Num),
+		FromCurrent: true, IsGift: true,
+		GiftName: gd.GiftName, GiftNum: gd.Num,
+	}:
+	default:
 	}
 }
 
