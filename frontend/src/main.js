@@ -267,6 +267,14 @@ window.saveSettings = async () => {
   }
 })();
 
+// 专注模式自动滚底定时器
+setInterval(() => {
+  if (document.body.classList.contains('focus-mode') && !document.body.matches(':hover')) {
+    const page = document.getElementById(currentTab === 'danmaku' ? 'danmakuPage' : 'queuePage');
+    if (page) page.scrollTop = page.scrollHeight;
+  }
+}, 500);
+
 // 监听更新
 Events.On('queue:updated', (event) => {
   const data = event.data;
