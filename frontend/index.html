@@ -15,7 +15,13 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { width:100%; height:100%; overflow:hidden; background:transparent; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; color:var(--text); -webkit-font-smoothing:antialiased; user-select:none; -webkit-user-select:none; }
   * { transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease, box-shadow 0.35s ease; }
-  body { display:flex; flex-direction:column; background:var(--bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--border); border-radius:10px; height:100%; }
+  body { display:flex; flex-direction:column; background:var(--bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--border); border-radius:10px; height:100%; transition:background 0.4s,border-color 0.4s; }
+  /* 专注模式：背景全透，chrome 隐藏 */
+  body.focus-mode { background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none; border-color:transparent; }
+  body.focus-mode .titlebar, body.focus-mode .status, body.focus-mode .tabs, body.focus-mode .shortcuts { opacity:0; transform:translateY(-8px); pointer-events:none; max-height:0; overflow:hidden; padding:0; transition:all 0.3s ease; }
+  body.focus-mode .content { padding-top:4px; }
+  body.focus-mode:hover .titlebar, body.focus-mode:hover .status, body.focus-mode:hover .tabs, body.focus-mode:hover .shortcuts,
+  body.focus-mode:focus-within .titlebar, body.focus-mode:focus-within .status, body.focus-mode:focus-within .tabs, body.focus-mode:focus-within .shortcuts { opacity:1; transform:translateY(0); pointer-events:auto; max-height:40px; }
 
   .titlebar { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; flex-shrink:0; }
   .titlebar-left { display:flex; align-items:center; gap:8px; }
@@ -157,8 +163,7 @@
     <span style="font-size:9px;color:var(--text-dim);font-weight:400">by netsysn</span>
   </div>
   <div class="titlebar-right">
-    <button class="titlebar-btn" style="--wails-draggable:no-drag" onclick="testData()" title="测试数据">T</button>
-<button class="titlebar-btn" style="--wails-draggable:no-drag" onclick="refreshDanmaku()" title="刷新弹幕">
+    <button class="titlebar-btn" style="--wails-draggable:no-drag" onclick="refreshDanmaku()" title="刷新弹幕">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
     </button>
     <button class="titlebar-btn" style="--wails-draggable:no-drag" onclick="showSettings()" title="设置">

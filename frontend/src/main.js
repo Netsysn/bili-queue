@@ -193,13 +193,25 @@ window.showSettings = async () => {
     initTags('tagHelpTypes', c.help_types||[]);
     initTags('tagServers', c.servers||[]);
     initTags('tagGifts', c.gift_queue||[]);
-    document.getElementById('cfgOpacity').value = Math.round((c.window_opacity||0.92)*100);
-    document.getElementById('cfgOpacityVal').textContent = Math.round((c.window_opacity||0.92)*100)+'%';
+    const opv = Math.round((c.window_opacity||0.92)*100);
+    document.getElementById('cfgOpacity').value = opv;
+    document.getElementById('cfgOpacityVal').textContent = opv+'%';
+    applyOpacity(opv);
   } catch(e) {}
 };
 window.hideSettings = () => document.getElementById('settingsModal').classList.add('hidden');
 window.onThemeToggle = () => document.body.classList.toggle('light', document.getElementById('cfgTheme').checked);
-window.onOpacityInput = () => { document.getElementById('cfgOpacityVal').textContent = document.getElementById('cfgOpacity').value+'%'; };
+function applyOpacity(v) {
+  const alpha = v / 100;
+  document.documentElement.style.setProperty('--bg', `rgba(10,10,16,${(alpha*0.9).toFixed(2)})`);
+  document.documentElement.style.setProperty('--surface', `rgba(22,22,34,${(alpha*0.78).toFixed(2)})`);
+  document.body.classList.toggle('focus-mode', v >= 95);
+}
+window.onOpacityInput = () => {
+  const v = parseInt(document.getElementById('cfgOpacity').value);
+  document.getElementById('cfgOpacityVal').textContent = v + '%';
+  applyOpacity(v);
+};
 window.stepNum = (id, delta) => {
   const el = document.getElementById(id);
   if (!el) return;
