@@ -17,12 +17,12 @@
   * { transition: background-color 0.35s ease, border-color 0.35s ease, color 0.35s ease, box-shadow 0.35s ease; }
   body { display:flex; flex-direction:column; background:var(--bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--border); border-radius:10px; height:100%; transition:background 0.4s,border-color 0.4s; }
   /* 专注模式：背景全透，chrome 隐藏 */
-  body.focus-mode { background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none; border-color:transparent; }
-  body.focus-mode .q-item { background:transparent; }
-  body.focus-mode .titlebar, body.focus-mode .status, body.focus-mode .tabs, body.focus-mode .shortcuts { opacity:0; transform:translateY(-8px); pointer-events:none; max-height:0; overflow:hidden; padding:0; transition:all 0.3s ease; }
-  body.focus-mode .content { padding-top:4px; }
-  body.focus-mode:hover { background:var(--bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-color:var(--border); }
-  body.focus-mode:hover .q-item { background:var(--surface); }
+  body.focus-mode { background:transparent; backdrop-filter:none; -webkit-backdrop-filter:none; border-color:transparent; box-shadow:none; }
+  body.focus-mode .q-item { background:rgba(0,0,0,0.35); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); border-radius:14px; padding:10px 12px; margin-bottom:4px; }
+  body.focus-mode .titlebar, body.focus-mode .status, body.focus-mode .tabs, body.focus-mode .shortcuts { opacity:0; transform:translateY(-8px); pointer-events:none; max-height:0; overflow:hidden; transition:all 0.3s ease; }
+  body.focus-mode .content { padding:8px; }
+  body.focus-mode:hover { background:var(--bg); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border-color:var(--border); box-shadow:none; }
+  body.focus-mode:hover .q-item { background:var(--surface); border-radius:6px; padding:8px 10px; margin-bottom:2px; }
   body.focus-mode:hover .titlebar, body.focus-mode:hover .status, body.focus-mode:hover .tabs, body.focus-mode:hover .shortcuts { opacity:1; transform:translateY(0); pointer-events:auto; max-height:40px; }
 
   .titlebar { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; flex-shrink:0; }
