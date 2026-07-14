@@ -18,3 +18,5 @@ Jul 15 05:46:30.129 INF [AssetFileServerFS] Handling request url=/favicon.ico fi
 2026/07/15 05:46:39 ws: msg#4 parsed=0 msgs
 2026/07/15 05:46:41 ws: msg#5 op=5 ver=3 len=109
 2026/07/15 05:46:41 ws: msg#5 parsed=0 msgs
+Jul 15 05:47:05.942 WRN Window #1 not found
+[0715/054705.951:ERROR:ui\gfx\win\window_impl.cc:172] Failed to unregister class Chrome_WidgetWin_0. Error = 1412
