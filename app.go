@@ -217,6 +217,7 @@ func (s *AppService) SaveConfig(c Config) {
 		cfg.TimeoutMinutes = c.TimeoutMinutes
 		cfg.WindowOpacity = c.WindowOpacity
 		cfg.PayMode = c.PayMode
+		cfg.FocusMode = c.FocusMode
 		if len(c.HelpTypes) > 0 { cfg.HelpTypes = c.HelpTypes }
 		if len(c.Servers) > 0   { cfg.Servers = c.Servers }
 		if len(c.GiftQueue) > 0 { cfg.GiftQueue = c.GiftQueue }

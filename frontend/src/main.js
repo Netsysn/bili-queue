@@ -193,24 +193,14 @@ window.showSettings = async () => {
     initTags('tagHelpTypes', c.help_types||[]);
     initTags('tagServers', c.servers||[]);
     initTags('tagGifts', c.gift_queue||[]);
-    const opv = Math.round((c.window_opacity||0.92)*100);
-    document.getElementById('cfgOpacity').value = opv;
-    document.getElementById('cfgOpacityVal').textContent = opv+'%';
-    applyOpacity(opv);
+    document.getElementById('cfgFocus').checked = c.focus_mode || false;
+    document.body.classList.toggle('focus-mode', c.focus_mode || false);
   } catch(e) {}
 };
 window.hideSettings = () => document.getElementById('settingsModal').classList.add('hidden');
 window.onThemeToggle = () => document.body.classList.toggle('light', document.getElementById('cfgTheme').checked);
-function applyOpacity(v) {
-  const alpha = v / 100;
-  document.documentElement.style.setProperty('--bg', `rgba(10,10,16,${(alpha*0.9).toFixed(2)})`);
-  document.documentElement.style.setProperty('--surface', `rgba(22,22,34,${(alpha*0.78).toFixed(2)})`);
-  document.body.classList.toggle('focus-mode', v >= 95);
-}
-window.onOpacityInput = () => {
-  const v = parseInt(document.getElementById('cfgOpacity').value);
-  document.getElementById('cfgOpacityVal').textContent = v + '%';
-  applyOpacity(v);
+window.toggleFocus = () => {
+  document.body.classList.toggle('focus-mode', document.getElementById('cfgFocus').checked);
 };
 window.stepNum = (id, delta) => {
   const el = document.getElementById(id);
@@ -231,8 +221,8 @@ window.saveSettings = async () => {
     theme: document.getElementById('cfgTheme').checked ? 'light' : 'dark',
     room_id: parseInt(document.getElementById('cfgRoom').value) || 1926788042,
     pay_mode: document.getElementById('cfgPayMode').checked,
+    focus_mode: document.getElementById('cfgFocus').checked,
     timeout_minutes: parseInt(document.getElementById('cfgTimeout').value) || 5,
-    window_opacity: parseInt(document.getElementById('cfgOpacity').value) / 100,
     help_types: getTags('tagHelpTypes'),
     servers: getTags('tagServers'),
     gift_queue: getTags('tagGifts'),
