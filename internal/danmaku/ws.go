@@ -39,9 +39,13 @@ func connectWS(roomID int64) (<-chan DanmakuMsg, error) {
 	token := getToken(realID)
 	buvid := getBuvid(roomID)
 
-	conn, _, err := websocket.DefaultDialer.Dial("wss://broadcastlv.chat.bilibili.com/sub", http.Header{
+	wsHeader := http.Header{
 		"User-Agent": {"Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-	})
+	}
+	if biliCookie != "" {
+		wsHeader.Set("Cookie", biliCookie)
+	}
+	conn, _, err := websocket.DefaultDialer.Dial("wss://broadcastlv.chat.bilibili.com/sub", wsHeader)
 	if err != nil {
 		return nil, fmt.Errorf("dial: %w", err)
 	}
