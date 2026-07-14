@@ -82,6 +82,7 @@ func (s *AppService) ServiceStartup(ctx context.Context, opts application.Servic
 	go s.consumeLoop()
 	go s.wsSource()
 	go s.httpSource()
+	go s.giftSource()
 	return nil
 }
 
@@ -119,6 +120,21 @@ func (s *AppService) wsSource() {
 		<-done
 		time.Sleep(3 * time.Second)
 	}
+}
+
+func (s *AppService) giftSource() {
+	cfg := getConfig()
+	if cfg.Cookie == "" { return } // 必须要有 Cookie
+	gift := danmaku.NewGiftPoller(s.roomID)
+	go func() {
+		for msg := range gift.Messages() {
+			select {
+			case s.msgCh <- msg:
+			default:
+			}
+		}
+	}()
+	gift.Poll(5 * time.Second)
 }
 
 func (s *AppService) httpSource() {
