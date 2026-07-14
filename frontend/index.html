@@ -148,6 +148,8 @@
   .settings-body { padding:0 14px; display:flex; flex-direction:column; gap:10px; }
   .s-row { display:flex; align-items:center; gap:10px; font-size:11px; justify-content:space-between; }
   .s-row>span:first-child { flex-shrink:0; color:var(--text); }
+  .help-btn { width:16px;height:16px;border-radius:50%;border:1px solid var(--text-muted);background:transparent;color:var(--text-muted);font-size:10px;font-weight:700;cursor:pointer;padding:0;line-height:1; }
+  .help-btn:hover { border-color:var(--accent);color:var(--accent); }
   .s-row input[type="text"],.s-row select { width:130px; padding:5px 8px; border-radius:5px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.04); color:var(--text); font-size:11px; font-family:inherit; outline:none; text-align:right; }
   body.light .s-row input[type="text"],body.light .s-row select { background:rgba(0,0,0,0.03); border-color:rgba(0,0,0,0.08); }
   .s-row input:focus,.s-row select:focus { border-color:rgba(167,139,250,0.5); }
@@ -254,7 +256,7 @@
       <label class="s-row"><span>帮类型</span><span class="tag-input-wrap" id="tagHelpTypes" onclick="this.querySelector('input').focus()"><input class="tag-input" placeholder="输入后回车" onkeydown="tagKey(event,'tagHelpTypes')"></span></label>
       <label class="s-row"><span>服务器</span><span class="tag-input-wrap" id="tagServers" onclick="this.querySelector('input').focus()"><input class="tag-input" placeholder="输入后回车" onkeydown="tagKey(event,'tagServers')"></span></label>
       <label class="s-row"><span>付费礼物</span><span class="tag-input-wrap" id="tagGifts" onclick="this.querySelector('input').focus()"><input class="tag-input" placeholder="送这些直接入队" onkeydown="tagKey(event,'tagGifts')"></span></label>
-      <label class="s-row"><span>Cookie</span><input type="text" id="cfgCookie" placeholder="B站 SESSDATA" style="width:140px;text-align:right"></label>
+      <label class="s-row"><span>Cookie <button class="help-btn" onclick="showCookieHelp()" title="如何获取Cookie">?</button></span><input type="text" id="cfgCookie" placeholder="B站 SESSDATA" style="width:140px;text-align:right"></label>
       <label class="s-row"><span>专注模式</span><label class="toggle"><input type="checkbox" id="cfgFocus" onchange="toggleFocus()"><span class="track"></span></label></label>
     </div>
     <div class="modal-btns" style="padding:10px 14px 14px"><button onclick="hideSettings()">取消</button><button class="danger" onclick="saveSettings()">保存</button></div>
