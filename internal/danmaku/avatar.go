@@ -6,14 +6,17 @@ import (
 	"io"
 	"net/http"
 	"sync"
-	"time"
 )
 
 var (
 	avatarCache = make(map[int64]string)
 	avatarMu    sync.RWMutex
-	httpClient  = &http.Client{Timeout: 5 * time.Second}
+	httpClient  *http.Client
 )
+
+func init() {
+	initHTTPClient()
+}
 
 func GetAvatar(uid int64) string {
 	if uid == 0 {

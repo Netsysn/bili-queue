@@ -104,7 +104,10 @@ function renderLogs(items) {
       <span class="d-time">${fmtTime(item.time)}</span>`;
     page.appendChild(div);
   });
-  page.scrollTop = page.scrollHeight;
+  // 专注模式未 hover 时强制滚到底部
+  if (document.body.classList.contains('focus-mode') && !document.body.matches(':hover')) {
+    page.scrollTop = page.scrollHeight;
+  }
 }
 
 // ── Tab 切换 ──
