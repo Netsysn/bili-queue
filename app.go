@@ -150,7 +150,8 @@ func (s *AppService) consumeLoop() {
 
 func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 	// 过滤 B站隐私预览消息（UID=0 是真实消息的预发布版本，后面会跟完整版）
-	if msg.UID == 0 {
+	// 礼物消息不在此列（来自 raw parse 可能有 UID=0 但仍是有效数据）
+	if msg.UID == 0 && !msg.IsGift {
 		return
 	}
 

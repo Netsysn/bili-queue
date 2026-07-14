@@ -130,19 +130,22 @@ func (c *Client) Connect() error {
 							GiftName string `json:"giftName"`
 							Num      int    `json:"num"`
 							Action   string `json:"action"`
+							UID      int64  `json:"uid"`
+							Face     string `json:"face"`
 						} `json:"data"`
 					}
 					if json.Unmarshal(data, &gift) == nil && gift.Cmd != "" {
+						log.Printf("[WS] Raw gift data: cmd=%s uname=%s gift=%s num=%d uid=%d", gift.Cmd, gift.Data.Uname, gift.Data.GiftName, gift.Data.Num, gift.Data.UID)
 						if strings.Contains(gift.Cmd, "GIFT") || gift.Data.GiftName != "" {
 							SetLive(true)
 							name := gift.Data.Uname
 							gname := gift.Data.GiftName
 							n := gift.Data.Num
 							if n == 0 { n = 1 }
-							log.Printf("[WS] Gift(raw): %s %s x%d (cmd=%s)", name, gname, n, gift.Cmd)
+							log.Printf("[WS] Gift(raw): uid=%d %s %s x%d (cmd=%s)", gift.Data.UID, name, gname, n, gift.Cmd)
 							select {
 							case c.msgCh <- DanmakuMsg{
-								Username: name, Content: fmt.Sprintf("送出 %s x%d", gname, n),
+								UID: gift.Data.UID, Username: name, Content: fmt.Sprintf("送出 %s x%d", gname, n),
 								FromCurrent: true, IsGift: true,
 								GiftName: gname, GiftNum: n,
 							}:
