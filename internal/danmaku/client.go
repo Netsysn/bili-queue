@@ -3,7 +3,6 @@ package danmaku
 import (
 	"fmt"
 	"log"
-	"time"
 )
 
 type DanmakuMsg struct {
@@ -38,8 +37,7 @@ func New(roomID int64) *Client {
 func (c *Client) Messages() <-chan DanmakuMsg { return c.msgCh }
 
 func (c *Client) Connect() error {
-	buvid := fmt.Sprintf("%d-infoc", time.Now().UnixNano())
-	ch, err := connectWS(c.roomID, buvid)
+	ch, err := connectWS(c.roomID)
 	if err != nil {
 		return fmt.Errorf("connect: %w", err)
 	}
