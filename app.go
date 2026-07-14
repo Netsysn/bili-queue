@@ -212,7 +212,9 @@ func (s *AppService) GetConfig() Config { return getConfig() }
 
 func (s *AppService) SetFocusMode(on bool) {
 	if on {
-		removeShadow()
+		setNoShadow()
+	} else {
+		restoreShadow()
 	}
 }
 
