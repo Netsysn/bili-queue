@@ -8,12 +8,12 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/andybalholm/brotli"
 	"github.com/gorilla/websocket"
 )
 
-// connectWS 直接连接 B站 WebSocket，发送鉴权包，返回消息通道。
 func connectWS(roomID int64, buvid string) (<-chan DanmakuMsg, error) {
 	realID, err := ResolveRoomID(roomID)
 	if err != nil {
@@ -28,17 +28,10 @@ func connectWS(roomID int64, buvid string) (<-chan DanmakuMsg, error) {
 		return nil, fmt.Errorf("dial: %w", err)
 	}
 
-	// 鉴权包（与 Bilibili_Danmuji 格式一致）
 	auth := map[string]any{
-		"uid":         0,
-		"roomid":      realID,
-		"protover":    3,
-		"buvid":       buvid,
-		"support_ack": true,
-		"scene":       "room",
-		"platform":    "web",
-		"type":        2,
-		"key":         token,
+		"uid": 0, "roomid": realID, "protover": 3,
+		"buvid": buvid, "support_ack": true, "scene": "room",
+		"platform": "web", "type": 2, "key": token,
 	}
 	body, _ := json.Marshal(auth)
 	pkt := packMsg(7, body)
@@ -48,19 +41,34 @@ func connectWS(roomID int64, buvid string) (<-chan DanmakuMsg, error) {
 	}
 	log.Printf("ws: sent auth to room %d", realID)
 
+	go wsPing(conn)
+
 	msgCh := make(chan DanmakuMsg, 512)
 	SetLive(true)
 	go wsReadLoop(conn, msgCh)
 	return msgCh, nil
 }
 
+func wsPing(conn *websocket.Conn) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		pkt := packMsg(2, []byte{})
+		if err := conn.WriteMessage(websocket.BinaryMessage, pkt); err != nil {
+			return
+		}
+	}
+}
+
 func wsReadLoop(conn *websocket.Conn, msgCh chan DanmakuMsg) {
 	defer conn.Close()
 	defer close(msgCh)
 
+	msgCount := 0
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
+			log.Printf("ws: read err=%v", err)
 			SetLive(false)
 			return
 		}
@@ -70,34 +78,70 @@ func wsReadLoop(conn *websocket.Conn, msgCh chan DanmakuMsg) {
 		op := binary.BigEndian.Uint32(data[8:12])
 		ver := binary.BigEndian.Uint16(data[6:8])
 		body := data[16:]
+		msgCount++
 
-		if op == 5 {
-			// 解压
-			var jsonData []byte
+		if msgCount <= 5 {
+			log.Printf("ws: msg#%d op=%d ver=%d len=%d", msgCount, op, ver, len(body))
+		}
+
+		switch op {
+		case 5:
+			var payload []byte
 			switch ver {
 			case 0:
-				jsonData = body
-			case 2:
-				jsonData = zlibDecompress(body)
+				payload = body
 			case 3:
-				jsonData = brotliDecompress(body)
+				payload = brotliDecompress(body)
 			default:
 				continue
 			}
-			parseMessages(jsonData, msgCh)
-		} else if op == 8 {
-			// Auth reply
+			// 解压后的数据可能包含多个子包，每个子包有 16 字节头
+			parsed := 0
+			for offset := 0; offset < len(payload); {
+				if offset+16 > len(payload) {
+					break
+				}
+				subLen := int(binary.BigEndian.Uint32(payload[offset : offset+4]))
+				if subLen < 16 || offset+subLen > len(payload) {
+					break
+				}
+				subVer := binary.BigEndian.Uint16(payload[offset+6 : offset+8])
+				subBody := payload[offset+16 : offset+subLen]
+				offset += subLen
+
+				var subData []byte
+				switch subVer {
+				case 0:
+					subData = subBody
+				case 2:
+					subData = zlibDecompress(subBody)
+				case 3:
+					subData = brotliDecompress(subBody)
+				}
+				parsed += parseMessages(subData, msgCh)
+			}
+			if msgCount <= 5 {
+				log.Printf("ws: msg#%d parsed=%d msgs", msgCount, parsed)
+			}
+		case 8:
 			var resp struct{ Code int `json:"code"` }
 			json.Unmarshal(body, &resp)
-			if resp.Code != 0 {
-				log.Printf("ws: auth rejected code=%d", resp.Code)
-			}
+			log.Printf("ws: auth reply code=%d", resp.Code)
 		}
 	}
 }
 
-func parseMessages(data []byte, msgCh chan DanmakuMsg) {
-	for _, line := range bytes.Split(data, []byte("\n")) {
+func firstLine(data []byte) string {
+	s := string(data)
+	if len(s) > 120 {
+		s = s[:120]
+	}
+	return s
+}
+
+func parseMessages(data []byte, msgCh chan DanmakuMsg) int {
+	count := 0
+	for _, line := range bytes.Split(data, []byte{'\n'}) {
 		if len(line) == 0 {
 			continue
 		}
@@ -116,6 +160,7 @@ func parseMessages(data []byte, msgCh chan DanmakuMsg) {
 			if dm.Content != "" {
 				select {
 				case msgCh <- dm:
+					count++
 				default:
 				}
 			}
@@ -124,6 +169,7 @@ func parseMessages(data []byte, msgCh chan DanmakuMsg) {
 			if gift.GiftName != "" {
 				select {
 				case msgCh <- gift:
+					count++
 				default:
 				}
 			}
@@ -132,16 +178,17 @@ func parseMessages(data []byte, msgCh chan DanmakuMsg) {
 		case "PREPARING":
 			SetLive(false)
 		case "GUARD_BUY", "COMBO_SEND":
-			// 上舰/连击礼物也解析
 			gift := parseGift(raw.Data)
 			if gift.GiftName != "" {
 				select {
 				case msgCh <- gift:
+					count++
 				default:
 				}
 			}
 		}
 	}
+	return count
 }
 
 func parseDanmu(info []any) DanmakuMsg {
@@ -167,7 +214,6 @@ func parseDanmu(info []any) DanmakuMsg {
 		username = "匿名用户"
 	}
 
-	// 勋章
 	var mn string
 	var ml int
 	if len(info) > 3 {
@@ -180,7 +226,6 @@ func parseDanmu(info []any) DanmakuMsg {
 			}
 		}
 	}
-	// 用户等级
 	var ul int
 	if len(info) > 4 {
 		if arr, ok := info[4].([]any); ok && len(arr) > 0 {
@@ -197,13 +242,11 @@ func parseDanmu(info []any) DanmakuMsg {
 }
 
 func parseGift(data json.RawMessage) DanmakuMsg {
-	// data 可能是对象或 JSON 字符串
 	var gd struct {
 		Uname    string `json:"uname"`
 		GiftName string `json:"giftName"`
 		Num      int    `json:"num"`
 		UID      int64  `json:"uid"`
-		Action   string `json:"action"`
 	}
 	if json.Unmarshal(data, &gd) != nil {
 		var str string
@@ -223,8 +266,7 @@ func parseGift(data json.RawMessage) DanmakuMsg {
 	return DanmakuMsg{
 		UID: gd.UID, Username: gd.Uname,
 		Content:     fmt.Sprintf("送出 %s x%d", gd.GiftName, gd.Num),
-		FromCurrent: true, IsGift: true,
-		GiftName: gd.GiftName, GiftNum: gd.Num,
+		FromCurrent: true, IsGift: true, GiftName: gd.GiftName, GiftNum: gd.Num,
 	}
 }
 
@@ -239,14 +281,13 @@ func packMsg(op uint32, body []byte) []byte {
 	return pkt
 }
 
+func zlibDecompress(data []byte) []byte {
+	return data
+}
+
 func brotliDecompress(data []byte) []byte {
 	r := brotli.NewReader(bytes.NewReader(data))
 	var out bytes.Buffer
 	out.ReadFrom(r)
 	return out.Bytes()
-}
-
-func zlibDecompress(data []byte) []byte {
-	// 简化 zlib 解压 — 大部分房间用 brotli
-	return data
 }
