@@ -18,6 +18,7 @@ type Config struct {
 	PayMode        bool     `json:"pay_mode"`   // 付费模式：仅送礼可入队
 	GiftQueue      []string `json:"gift_queue"` // 付费模式下的有效礼物
 	FocusMode      bool     `json:"focus_mode"` // 专注模式：背景全透
+	Cookie         string   `json:"cookie"`      // B站 SESSDATA Cookie
 }
 
 var defaultConfig = Config{
