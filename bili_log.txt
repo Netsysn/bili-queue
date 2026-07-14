@@ -1,46 +1,18 @@
-Jul 15 07:25:10.047 INF Build Info: Wails=v3.0.0-alpha2.117 Compiler=go1.25.5 vcs.revision=a90b858ed35eb8daeed39a59a972746c842e3274 -buildmode=exe CGO_CFLAGS= CGO_CXXFLAGS= GOOS=windows vcs.time=2026-07-14T22:55:22Z vcs.modified=true -compiler=gc CGO_ENABLED=1 CGO_CPPFLAGS= CGO_LDFLAGS= GOARCH=amd64 GOAMD64=v1 vcs=git
-Jul 15 07:25:10.051 INF AssetServer Info: middleware=true handler=true
-Jul 15 07:25:10.051 INF Platform Info: Go-WebView2Loader=true WebView2=150.0.4078.65 ID=25H2 Name=Windows 10 Pro Version=2009 (Build: 26200) Branding=Windows 11 专业版
-2026/07/15 07:25:10 [WebView2] Environment created successfully
-2026/07/15 07:25:10 getDanmuInfo: wbiSign wts=1784071510 wRid=92cf1f7dafc3ff406f83a677fd32eb02 key=7cd084941338484aae1ad9425b84077c4932caff0ff746eab6f01bf08b70ac45
-2026/07/15 07:25:10 getDanmuInfo: code=-352 body={"code":-352,"message":"-352","ttl":1}
-2026/07/15 07:25:10 ws: auth sent room=1832484713 host=broadcastlv.chat.bilibili.com:2243
-2026/07/15 07:25:10 ws: connected to room 1832484713
-Jul 15 07:25:10.708 INF [AssetFileServerFS] Handling request url=/ file=.
-Jul 15 07:25:10.796 INF [AssetFileServerFS] Handling request url=/assets/index-DGhIyXLo.js file=assets/index-DGhIyXLo.js
-Jul 15 07:25:10.919 INF [AssetFileServerFS] Handling request url=/favicon.ico file=favicon.ico
-2026/07/15 07:25:20 [CMD] ONLINE_RANK_COUNT
-2026/07/15 07:25:20 [CMD] ONLINE_RANK_V2
-2026/07/15 07:25:25 [CMD] ONLINE_RANK_COUNT
-2026/07/15 07:25:29 [CMD] STOP_LIVE_ROOM_LIST
-2026/07/15 07:25:40 [CMD] COMMON_NOTICE_DANMAKU
-2026/07/15 07:25:45 [CMD] DANMU_MSG
-2026/07/15 07:25:51 [CMD] DANMU_MSG
-2026/07/15 07:25:57 [CMD] ONLINE_RANK_COUNT
-2026/07/15 07:25:57 [CMD] ONLINE_RANK_V2
-2026/07/15 07:25:59 [CMD] STOP_LIVE_ROOM_LIST
-2026/07/15 07:26:02 [CMD] POPULAR_RANK_CHANGED
-2026/07/15 07:26:08 [CMD] ONLINE_RANK_V2
-2026/07/15 07:26:13 [CMD] ONLINE_RANK_COUNT
-2026/07/15 07:26:14 [CMD] WATCHED_CHANGE
-2026/07/15 07:26:17 [CMD] ONLINE_RANK_V2
-2026/07/15 07:26:17 [CMD] ONLINE_RANK_COUNT
-2026/07/15 07:26:17 [CMD] DANMU_MSG
-2026/07/15 07:26:21 [CMD] ONLINE_RANK_COUNT
-2026/07/15 07:26:22 [CMD] COMBO_SEND
-2026/07/15 07:26:29 [CMD] DANMU_MSG
-2026/07/15 07:26:29 [CMD] STOP_LIVE_ROOM_LIST
-2026/07/15 07:26:31 [CMD] DANMU_MSG
-2026/07/15 07:26:36 [CMD] ONLINE_RANK_V2
-2026/07/15 07:26:36 [CMD] ONLINE_RANK_COUNT
-2026/07/15 07:26:44 [CMD] DANMU_MSG
-2026/07/15 07:26:47 [CMD] ONLINE_RANK_COUNT
-2026/07/15 07:26:47 [CMD] ONLINE_RANK_V2
-2026/07/15 07:26:47 [CMD] DANMU_MSG
-2026/07/15 07:26:48 [CMD] DANMU_MSG
-2026/07/15 07:26:59 [CMD] STOP_LIVE_ROOM_LIST
-2026/07/15 07:27:01 [CMD] POPULAR_RANK_CHANGED
-2026/07/15 07:27:02 [CMD] ONLINE_RANK_COUNT
-2026/07/15 07:27:02 [CMD] ONLINE_RANK_V2
-Jul 15 07:27:07.668 WRN Window #1 not found
-[0715/072707.710:ERROR:ui\gfx\win\window_impl.cc:172] Failed to unregister class Chrome_WidgetWin_0. Error = 1412
+Jul 15 07:30:00.109 INF Build Info: Wails=v3.0.0-alpha2.117 Compiler=go1.25.5 CGO_ENABLED=1 CGO_CPPFLAGS= CGO_CXXFLAGS= GOARCH=amd64 GOAMD64=v1 vcs.time=2026-07-14T23:27:21Z CGO_CFLAGS= CGO_LDFLAGS= GOOS=windows vcs=git vcs.revision=ccb6563f38746a69f2d4e7388a2d7f8ad8d63b59 vcs.modified=true -buildmode=exe -compiler=gc
+Jul 15 07:30:00.112 INF Platform Info: Go-WebView2Loader=true WebView2=150.0.4078.65 ID=25H2 Name=Windows 10 Pro Version=2009 (Build: 26200) Branding=Windows 11 专业版
+Jul 15 07:30:00.112 INF AssetServer Info: middleware=true handler=true
+2026/07/15 07:30:00 [WebView2] Environment created successfully
+2026/07/15 07:30:00 giftPoller: status=200
+2026/07/15 07:30:00 getDanmuInfo: wbiSign wts=1784071800 wRid=55fdcff7d600db1d90eb7bdf775a134d key=7cd084941338484aae1ad9425b84077c4932caff0ff746eab6f01bf08b70ac45
+2026/07/15 07:30:00 getDanmuInfo: code=-352 body={"code":-352,"message":"-352","ttl":1}
+2026/07/15 07:30:00 ws: auth sent room=1832484713 host=bd-bj-live-comet-08.chat.bilibili.com:2243
+2026/07/15 07:30:00 ws: connected to room 1832484713
+Jul 15 07:30:01.062 INF [AssetFileServerFS] Handling request url=/ file=.
+Jul 15 07:30:01.167 INF [AssetFileServerFS] Handling request url=/assets/index-Ch6AcURr.js file=assets/index-Ch6AcURr.js
+Jul 15 07:30:01.345 INF [AssetFileServerFS] Handling request url=/favicon.ico file=favicon.ico
+2026/07/15 07:30:05 giftPoller: status=200
+2026/07/15 07:30:10 giftPoller: status=200
+2026/07/15 07:30:15 giftPoller: status=200
+2026/07/15 07:30:20 giftPoller: status=200
+Jul 15 07:30:21.856 WRN Window #1 not found
+[0715/073021.896:ERROR:ui\gfx\win\window_impl.cc:172] Failed to unregister class Chrome_WidgetWin_0. Error = 1412

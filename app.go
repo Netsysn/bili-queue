@@ -123,8 +123,6 @@ func (s *AppService) wsSource() {
 }
 
 func (s *AppService) giftSource() {
-	cfg := getConfig()
-	if cfg.Cookie == "" { return } // 必须要有 Cookie
 	gift := danmaku.NewGiftPoller(s.roomID)
 	go func() {
 		for msg := range gift.Messages() {

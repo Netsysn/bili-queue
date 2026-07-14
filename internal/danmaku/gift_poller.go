@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -70,8 +71,10 @@ func (g *GiftPoller) fetch() {
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
+		log.Printf("giftPoller: request err=%v", err)
 		return
 	}
+	log.Printf("giftPoller: status=%d", resp.StatusCode)
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)

@@ -89,13 +89,7 @@ func tcpLoop(conn net.Conn, msgCh chan DanmakuMsg) {
 			if ver == 3 {
 				payload = brotliDecompress(body)
 			}
-			// 搜索所有 {"cmd":"..."} JSON 块
-	for _, chunk := range bytes.Split(payload, []byte{'\n'}) {
-		if len(chunk) == 0 { continue }
-		idx := bytes.Index(chunk, []byte(`{"cmd"`))
-		if idx < 0 { continue }
-		parseSingle(chunk[idx:], msgCh)
-	}
+			processPayload(payload, msgCh)
 		case 8:
 			var resp struct{ Code int `json:"code"` }
 			json.Unmarshal(body, &resp)
@@ -206,7 +200,10 @@ func processPayload(payload []byte, msgCh chan DanmakuMsg) {
 	for offset := 0; offset+16 <= len(payload); {
 		packLen := int(binary.BigEndian.Uint32(payload[offset : offset+4]))
 		if packLen < 16 || offset+packLen > len(payload) {
-			parseMessages(payload[offset:], msgCh)
+			// packLen invalid, skip header and try remaining
+			if len(payload) > offset+16 {
+				parseMessages(payload[offset+16:], msgCh)
+			}
 			return
 		}
 		subVer := binary.BigEndian.Uint16(payload[offset+6 : offset+8])
