@@ -150,9 +150,6 @@ window.refreshDanmaku = () => {
   document.getElementById('statusText').textContent = '刷新中...';
   setTimeout(() => { document.getElementById('statusText').textContent = '监听中'; }, 2000);
 };
-window.testData = () => {
-  Call.ByName(SVC + '.TestData');
-};
 window.minimizeWin = () => Window.Minimise();
 
 // ── 标签输入 ──
