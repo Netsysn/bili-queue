@@ -1,0 +1,28 @@
+Jul 15 05:35:49.997 INF Build Info: Wails=v3.0.0-alpha2.117 Compiler=go1.25.5 GOOS=windows vcs=git vcs.time=2026-07-14T21:31:30Z -buildmode=exe CGO_ENABLED=1 CGO_CPPFLAGS= GOAMD64=v1 vcs.revision=23d74e3f4683f5f5b2cbbd33e73bd76acd5ac20c vcs.modified=true -compiler=gc CGO_CFLAGS= CGO_CXXFLAGS= CGO_LDFLAGS= GOARCH=amd64
+Jul 15 05:35:50.000 INF AssetServer Info: middleware=true handler=true
+Jul 15 05:35:50.000 INF Platform Info: Go-WebView2Loader=true WebView2=150.0.4078.65 ID=25H2 Name=Windows 10 Pro Version=2009 (Build: 26200) Branding=Windows 11 专业版
+2026/07/15 05:35:50 [WebView2] Environment created successfully
+2026/07/15 05:35:50 [getToken] OK: COUzMiHZ6ZR-HAfnKdOCuhCzQZsX6E0ncA97LeXXKqJMUI8b97Hp00mWgPWGJI9CNrYtPr5Q7KK9ZbhEWcebU00g3Cj_3w8fUqRr2T4PEY2uhE7oqo8M0O9pwqZL3we3PAM2gAL7Gdw20bNe2ZNjgPv_efEBPDvNReFMgfnUqg2f4aYy9EUhkpeL-MaDSBkxIIK1GsMKOcazwkKuWg==
+Jul 15 05:35:50.515 INF [AssetFileServerFS] Handling request url=/ file=.
+Jul 15 05:35:50.575 INF [AssetFileServerFS] Handling request url=/assets/index-BlD2qo1R.js file=assets/index-BlD2qo1R.js
+2026/07/15 05:35:50 [WS] msg#1 type=*live.MsgHeartbeatReply
+Jul 15 05:35:50.645 INF [AssetFileServerFS] Handling request url=/favicon.ico file=favicon.ico
+2026/07/15 05:35:50 [WS] msg#2 type=*live.MsgGeneral
+2026/07/15 05:35:50 [WS] msg#2 MsgGeneral cmd=LOG_IN_NOTICE
+2026/07/15 05:36:20 [WS] msg#3 type=*live.MsgHeartbeatReply
+2026/07/15 05:36:42 [WS] msg#4 type=*live.MsgDanmaku
+2026/07/15 05:36:50 [WS] msg#5 type=*live.MsgHeartbeatReply
+2026/07/15 05:37:01 [WS] msg#6 type=*live.MsgDanmaku
+2026/07/15 05:37:20 [WS] msg#7 type=*live.MsgHeartbeatReply
+2026/07/15 05:37:46 [WS] msg#8 type=*live.MsgOnlineRankCount
+2026/07/15 05:37:46 [WS] msg#9 type=*live.MsgGeneral
+2026/07/15 05:37:46 [WS] msg#9 MsgGeneral cmd=ONLINE_RANK_V3
+2026/07/15 05:37:50 [WS] msg#10 type=*live.MsgHeartbeatReply
+2026/07/15 05:37:51 [WS] msg#11 type=*live.MsgOnlineRankCount
+2026/07/15 05:37:51 [WS] msg#12 type=*live.MsgWatChed
+2026/07/15 05:38:09 [WS] msg#13 type=*live.MsgGeneral
+2026/07/15 05:38:09 [WS] msg#13 MsgGeneral cmd=INTERACT_WORD_V2
+2026/07/15 05:38:09 [WS] msg#14 type=*live.MsgEntryEffect
+2026/07/15 05:38:20 [WS] msg#15 type=*live.MsgHeartbeatReply
+2026/07/15 05:38:50 [WS] msg#16 type=*live.MsgHeartbeatReply
+2026/07/15 05:38:59 [WS] msg#17 type=*live.MsgStopLiveRoomList
