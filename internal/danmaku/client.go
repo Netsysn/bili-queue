@@ -1,8 +1,14 @@
 package danmaku
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"strings"
+	"time"
+
+	"github.com/gorilla/websocket"
+	live "github.com/iyear/biligo-live"
 )
 
 type DanmakuMsg struct {
@@ -37,23 +43,59 @@ func New(roomID int64) *Client {
 func (c *Client) Messages() <-chan DanmakuMsg { return c.msgCh }
 
 func (c *Client) Connect() error {
-	ch, err := connectWS(c.roomID)
+	realID, err := ResolveRoomID(c.roomID)
 	if err != nil {
-		return fmt.Errorf("connect: %w", err)
+		return fmt.Errorf("resolve room: %w", err)
 	}
-	log.Printf("ws: connected to room %d", c.roomID)
+	SetLive(true)
+	token := getToken(realID)
+
+	l := live.NewLive(false, 30*time.Second, 0, nil)
+	if err := l.Conn(websocket.DefaultDialer, live.WsDefaultHost); err != nil {
+		return fmt.Errorf("conn: %w", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		if err := l.Enter(ctx, realID, token, 0); err != nil {
+			log.Printf("danmaku enter: %v", err)
+		}
+	}()
 
 	for {
 		select {
-		case msg, ok := <-ch:
-			if !ok {
-				return fmt.Errorf("ws closed")
+		case tp := <-l.Rev:
+			if tp.Error != nil {
+				continue
 			}
-			select {
-			case c.msgCh <- msg:
-			default:
+			switch m := tp.Msg.(type) {
+			case *live.MsgLive:
+				SetLive(true)
+			case *live.MsgPreparing:
+				SetLive(false)
+			case *live.MsgDanmaku:
+				SetLive(true)
+				dm, err := m.Parse()
+				if err != nil {
+					continue
+				}
+				uname := dm.Uname
+				if dm.MID == 0 || strings.Contains(uname, "***") {
+					uname = "匿名用户"
+				}
+				select {
+				case c.msgCh <- DanmakuMsg{
+					UID: dm.MID, Username: uname, Content: dm.Content,
+					FromCurrent: true,
+					MedalName: dm.MedalName, MedalLevel: dm.MedalLevel,
+					UserLevel: dm.UserLevel, Vip: dm.Vip,
+				}:
+				default:
+				}
 			}
 		case <-c.stopCh:
+			SetLive(false)
 			return nil
 		}
 	}
@@ -66,6 +108,3 @@ func (c *Client) Stop() {
 		close(c.stopCh)
 	}
 }
-
-// checkLive stub for compatibility
-func (c *Client) checkLive(realID int64) {}

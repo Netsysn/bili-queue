@@ -37,7 +37,6 @@ func connectWS(roomID int64) (<-chan DanmakuMsg, error) {
 		return nil, err
 	}
 	token := getToken(realID)
-	buvid := getBuvid(roomID)
 
 	wsHeader := http.Header{
 		"User-Agent": {"Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
@@ -52,7 +51,7 @@ func connectWS(roomID int64) (<-chan DanmakuMsg, error) {
 
 	auth := map[string]any{
 		"uid": 0, "roomid": realID, "protover": 3,
-		"buvid": buvid, "platform": "web", "type": 2, "key": token,
+		"platform": "web", "type": 2, "key": token,
 	}
 	ab, _ := json.Marshal(auth)
 	if err := conn.WriteMessage(websocket.BinaryMessage, packWS(7, ab)); err != nil {
@@ -117,7 +116,12 @@ func processPayload(payload []byte, msgCh chan DanmakuMsg) {
 		if subVer == 3 {
 			subData = brotliDecompress(subData)
 		}
-		parseMessages(subData, msgCh)
+		if len(subData) > 0 && subData[0] == '{' {
+				log.Printf("[WS-SUB] offset=%d ver=%d JSON=%.80s", offset, subVer, string(subData))
+			} else if len(subData) > 0 {
+				log.Printf("[WS-SUB] offset=%d ver=%d len=%d firstByte=0x%02x", offset, subVer, len(subData), subData[0])
+			}
+			parseMessages(subData, msgCh)
 		offset += packLen
 	}
 }
@@ -136,6 +140,7 @@ func parseMessages(data []byte, msgCh chan DanmakuMsg) {
 			continue
 		}
 
+		log.Printf("[WS-CMD] %s", raw.Cmd)
 		switch raw.Cmd {
 		case "DANMU_MSG":
 			dm := parseWSdanmu(raw.Info)
