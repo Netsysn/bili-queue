@@ -211,8 +211,8 @@ func (s *AppService) Quit() {
 func (s *AppService) GetConfig() Config { return getConfig() }
 
 func (s *AppService) SetFocusMode(on bool) {
-	if mainWindow != nil {
-		mainWindow.SetFrameless(on) // frameless = 无边框无阴影
+	if on {
+		removeShadow()
 	}
 }
 
