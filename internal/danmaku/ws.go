@@ -48,8 +48,7 @@ func connectWS(roomID int64) (<-chan DanmakuMsg, error) {
 
 	auth := map[string]any{
 		"uid": 0, "roomid": realID, "protover": 3,
-		"buvid": buvid, "support_ack": true, "scene": "room",
-		"platform": "web", "type": 2, "key": token,
+		"buvid": buvid, "platform": "web", "type": 2, "key": token,
 	}
 	ab, _ := json.Marshal(auth)
 	if err := conn.WriteMessage(websocket.BinaryMessage, packWS(7, ab)); err != nil {
