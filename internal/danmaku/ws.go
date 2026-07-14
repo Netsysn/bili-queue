@@ -85,11 +85,11 @@ func tcpLoop(conn net.Conn, msgCh chan DanmakuMsg) {
 		}
 		switch op {
 		case 5:
-			payload := body
 			if ver == 3 {
-				payload = brotliDecompress(body)
+				streamRead(body, msgCh)
+			} else {
+				parseMessages(body, msgCh)
 			}
-			processPayload(payload, msgCh)
 		case 8:
 			var resp struct{ Code int `json:"code"` }
 			json.Unmarshal(body, &resp)
@@ -99,6 +99,26 @@ func tcpLoop(conn net.Conn, msgCh chan DanmakuMsg) {
 		case 3:
 			SetLive(true)
 		}
+	}
+}
+
+func streamRead(compressed []byte, msgCh chan DanmakuMsg) {
+	r := brotli.NewReader(bytes.NewReader(compressed))
+	for {
+		header := make([]byte, 16)
+		if _, err := io.ReadFull(r, header); err != nil {
+			return
+		}
+		packLen := int(binary.BigEndian.Uint32(header[0:4]))
+		if packLen < 16 {
+			return
+		}
+		bodyLen := packLen - 16
+		body := make([]byte, bodyLen)
+		if _, err := io.ReadFull(r, body); err != nil {
+			return
+		}
+		parseMessages(body, msgCh)
 	}
 }
 
@@ -132,10 +152,9 @@ func getBuvid3() string {
 	return fmt.Sprintf("%d-infoc", rand.Int63())
 }
 
-func getDanmuInfo(roomID int64) (string,string,int) {
+func getDanmuInfo(roomID int64) (string, string, int) {
 	baseURL := fmt.Sprintf("https://api.live.bilibili.com/xlive/web-room/v1/index/getDanmuInfo?id=%d", roomID)
 	wts, wRid := wbiSign(map[string]string{"id": strconv.FormatInt(roomID, 10)})
-	log.Printf("getDanmuInfo: wbiSign wts=%s wRid=%s key=%s", wts, wRid, wbiKey)
 	if wts != "" {
 		baseURL += "&w_rid=" + wRid + "&wts=" + wts
 	}
@@ -151,15 +170,14 @@ func getDanmuInfo(roomID int64) (string,string,int) {
 	var r struct {
 		Code int `json:"code"`
 		Data struct {
-			Token string `json:"token"`
+			Token    string `json:"token"`
 			HostList []struct {
 				Host string `json:"host"`
-				Port int `json:"port"`
+				Port int    `json:"port"`
 			} `json:"host_list"`
 		} `json:"data"`
 	}
 	if json.Unmarshal(body, &r) != nil || r.Code != 0 || len(r.Data.HostList) == 0 {
-		log.Printf("getDanmuInfo: code=%d body=%s", r.Code, string(body))
 		return "", "", 0
 	}
 	h := r.Data.HostList[rand.Intn(len(r.Data.HostList))]
@@ -196,49 +214,6 @@ func getConfInfo(roomID int64) (token, host string, port int) {
 	return r.Data.Token, "broadcastlv.chat.bilibili.com", 2243
 }
 
-func processPayload(payload []byte, msgCh chan DanmakuMsg) {
-	for offset := 0; offset+16 <= len(payload); {
-		packLen := int(binary.BigEndian.Uint32(payload[offset : offset+4]))
-		if packLen < 16 || offset+packLen > len(payload) {
-			// packLen invalid, skip header and try remaining
-			if len(payload) > offset+16 {
-				parseMessages(payload[offset+16:], msgCh)
-			}
-			return
-		}
-		subVer := binary.BigEndian.Uint16(payload[offset+6 : offset+8])
-		subData := payload[offset+16 : offset+packLen]
-		if subVer == 3 {
-			subData = brotliDecompress(subData)
-		}
-		parseMessages(subData, msgCh)
-		offset += packLen
-	}
-}
-
-func parseSingle(data []byte, msgCh chan DanmakuMsg) {
-	var raw struct {
-		Cmd  string          `json:"cmd"`
-		Info []any           `json:"info"`
-		Data json.RawMessage `json:"data"`
-	}
-	if json.Unmarshal(data, &raw) != nil { return }
-	log.Printf("[CMD] %s", raw.Cmd)
-	switch raw.Cmd {
-	case "DANMU_MSG":
-		dm := parseDM(raw.Info)
-		if dm.Content != "" { select { case msgCh <- dm: default: } }
-	case "SEND_GIFT", "GUARD_BUY", "COMBO_SEND":
-		gift := parseGift(raw.Data)
-		if gift.GiftName != "" {
-			log.Printf("[GIFT] %s %s x%d", gift.Username, gift.GiftName, gift.GiftNum)
-			select { case msgCh <- gift: default: }
-		}
-	case "LIVE": SetLive(true)
-	case "PREPARING": SetLive(false)
-	}
-}
-
 func parseMessages(data []byte, msgCh chan DanmakuMsg) {
 	for _, line := range bytes.Split(data, []byte{'\n'}) {
 		if len(line) == 0 {
@@ -252,9 +227,7 @@ func parseMessages(data []byte, msgCh chan DanmakuMsg) {
 		if json.Unmarshal(line, &raw) != nil {
 			continue
 		}
-		if raw.Cmd != "ONLINE_RANK_COUNT" && raw.Cmd != "ONLINE_RANK_V2" && raw.Cmd != "WATCHED_CHANGE" {
-			log.Printf("[CMD] %s", raw.Cmd)
-		}
+		log.Printf("[CMD] %s", raw.Cmd)
 		switch raw.Cmd {
 		case "DANMU_MSG":
 			dm := parseDM(raw.Info)
