@@ -65,11 +65,20 @@ func (c *Client) Connect() error {
 	}()
 
 	lastCheck := time.Now()
+	msgCount := 0
 	for {
 		select {
 		case tp := <-l.Rev:
 			if tp.Error != nil {
 				continue
+			}
+			msgCount++
+			if msgCount <= 50 {
+				if gm, ok := tp.Msg.(*live.MsgGeneral); ok {
+					log.Printf("[RAW] #%d MsgGeneral: %s", msgCount, string(gm.Raw()))
+				} else {
+					log.Printf("[RAW] #%d type=%T", msgCount, tp.Msg)
+				}
 			}
 			switch m := tp.Msg.(type) {
 			case *live.MsgHeartbeatReply:
