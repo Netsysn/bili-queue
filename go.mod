@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/andybalholm/brotli v1.0.3
 	github.com/gorilla/websocket v1.5.3
+	github.com/iyear/biligo-live v0.1.5
 	github.com/wailsapp/wails/v3 v3.0.0-alpha2.117
 	golang.org/x/sys v0.43.0
 )
