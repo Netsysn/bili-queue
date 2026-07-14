@@ -200,7 +200,10 @@ window.showSettings = async () => {
 window.hideSettings = () => document.getElementById('settingsModal').classList.add('hidden');
 window.onThemeToggle = () => document.body.classList.toggle('light', document.getElementById('cfgTheme').checked);
 window.showCookieHelp = () => {
-  alert('获取 Cookie 方法：\n1. 浏览器打开 bilibili.com 并登录\n2. 按 F12 → Application → Cookies → bilibili.com\n3. 找到 SESSDATA，复制值粘贴到输入框\n4. 保存设置，重启 BiliQueue');
+  document.getElementById('cookieHelpModal').classList.remove('hidden');
+};
+window.hideCookieHelp = () => {
+  document.getElementById('cookieHelpModal').classList.add('hidden');
 };
 window.toggleFocus = () => {
   const on = document.getElementById('cfgFocus').checked;
