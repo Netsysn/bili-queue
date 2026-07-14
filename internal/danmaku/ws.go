@@ -5,103 +5,182 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"math/rand"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/andybalholm/brotli"
-	"github.com/gorilla/websocket"
 )
-
-func getBuvid(roomID int64) string {
-	api := fmt.Sprintf("https://api.live.bilibili.com/room/v1/Room/room_init?id=%d", roomID)
-	req, _ := http.NewRequest("GET", api, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return fmt.Sprintf("%d-infoc", time.Now().UnixNano())
-	}
-	defer resp.Body.Close()
-	for _, c := range resp.Cookies() {
-		if c.Name == "buvid3" && c.Value != "" {
-			return c.Value
-		}
-	}
-	return fmt.Sprintf("%d-infoc", time.Now().UnixNano())
-}
 
 func connectWS(roomID int64) (<-chan DanmakuMsg, error) {
 	realID, err := ResolveRoomID(roomID)
 	if err != nil {
 		return nil, err
 	}
-	token := getToken(realID)
 
-	wsHeader := http.Header{
-		"User-Agent": {"Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-	}
-	if biliCookie != "" {
-		wsHeader.Set("Cookie", biliCookie)
-	}
-	conn, _, err := websocket.DefaultDialer.Dial("wss://broadcastlv.chat.bilibili.com/sub", wsHeader)
+	// 获取 buvid3
+	buvid := getBuvid3()
+
+	// 获取 token + host（用 getConf，不用 getDanmuInfo 避免 -352）
+	token, host, port := getConfInfo(realID)
+
+	// TCP 连接
+	addr := fmt.Sprintf("%s:%d", host, port)
+	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
 	if err != nil {
-		return nil, fmt.Errorf("dial: %w", err)
+		return nil, fmt.Errorf("dial %s: %w", addr, err)
 	}
 
+	// 发送鉴权包
 	auth := map[string]any{
 		"uid": 0, "roomid": realID, "protover": 3,
-		"platform": "web", "type": 2, "key": token,
+		"buvid": buvid, "key": token,
+		"platform": "danmuji", "type": 2,
 	}
 	ab, _ := json.Marshal(auth)
-	if err := conn.WriteMessage(websocket.BinaryMessage, packWS(7, ab)); err != nil {
+	if err := sendTCPPacket(conn, 16, 1, 7, 1, ab); err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("auth write: %w", err)
+		return nil, fmt.Errorf("auth: %w", err)
 	}
-	log.Printf("ws: auth sent room=%d", realID)
+	log.Printf("ws: auth sent room=%d host=%s", realID, addr)
 
-	go wsPing(conn)
-
-	msgCh := make(chan DanmakuMsg, 512)
 	SetLive(true)
-	go wsReadLoop(conn, msgCh)
+	msgCh := make(chan DanmakuMsg, 512)
+	go tcpReadLoop(conn, msgCh)
 	return msgCh, nil
 }
 
-func wsPing(conn *websocket.Conn) {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		conn.WriteMessage(websocket.BinaryMessage, packWS(2, []byte{}))
-	}
-}
-
-func wsReadLoop(conn *websocket.Conn, msgCh chan DanmakuMsg) {
+func tcpReadLoop(conn net.Conn, msgCh chan DanmakuMsg) {
 	defer conn.Close()
 	defer close(msgCh)
 	defer SetLive(false)
 
+	// 心跳 goroutine
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			sendTCPPacket(conn, 16, 1, 2, 1, []byte{})
+		}
+	}()
+
 	for {
-		_, data, err := conn.ReadMessage()
-		if err != nil {
+		header := make([]byte, 16)
+		if _, err := io.ReadFull(conn, header); err != nil {
 			return
 		}
-		if len(data) < 16 {
-			continue
-		}
-		op := binary.BigEndian.Uint32(data[8:12])
-		ver := binary.BigEndian.Uint16(data[6:8])
-		body := data[16:]
+		packLen := int(binary.BigEndian.Uint32(header[0:4]))
+		ver := binary.BigEndian.Uint16(header[6:8])
+		op := binary.BigEndian.Uint32(header[8:12])
 
-		if op != 5 {
+		bodyLen := packLen - 16
+		if bodyLen < 0 || bodyLen > 1024*1024 {
 			continue
 		}
-		payload := body
-		if ver == 3 {
-			payload = brotliDecompress(body)
+		body := make([]byte, bodyLen)
+		if bodyLen > 0 {
+			if _, err := io.ReadFull(conn, body); err != nil {
+				return
+			}
 		}
-		processPayload(payload, msgCh)
+
+		log.Printf("[TCP] op=%d ver=%d len=%d", op, ver, packLen)
+		switch op {
+		case 5: // 消息
+			payload := body
+			if ver == 3 {
+				payload = brotliDecompress(body)
+			}
+			log.Printf("[TCP-DATA] ver=%d decompressed=%d bytes first=%.100s", ver, len(payload), payload)
+				processPayload(payload, msgCh)
+		case 8: // 鉴权回复
+			var resp struct{ Code int `json:"code"` }
+			json.Unmarshal(body, &resp)
+			if resp.Code != 0 {
+				log.Printf("ws: auth rejected code=%d", resp.Code)
+			}
+		case 3: // 心跳（人气值）
+			SetLive(true)
+		}
 	}
+}
+
+func sendTCPPacket(conn net.Conn, magic uint16, ver uint16, op uint32, seq uint32, body []byte) error {
+	packLen := 16 + len(body)
+	buf := make([]byte, packLen)
+	binary.BigEndian.PutUint32(buf[0:4], uint32(packLen))
+	binary.BigEndian.PutUint16(buf[4:6], magic)
+	binary.BigEndian.PutUint16(buf[6:8], ver)
+	binary.BigEndian.PutUint32(buf[8:12], op)
+	binary.BigEndian.PutUint32(buf[12:16], seq)
+	copy(buf[16:], body)
+	_, err := conn.Write(buf)
+	return err
+}
+
+func getBuvid3() string {
+	req, _ := http.NewRequest("GET", "https://api.bilibili.com/x/frontend/finger/spi", nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Sprintf("%d-infoc", rand.Int63())
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var r struct {
+		Data struct {
+			B3 string `json:"b_3"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(body, &r) == nil && r.Data.B3 != "" {
+		return r.Data.B3
+	}
+	return fmt.Sprintf("%d-infoc", rand.Int63())
+}
+
+type danmuInfo struct {
+	Host string
+	Port int
+	Token string
+}
+
+func getConfInfo(roomID int64) (token string, host string, port int) {
+	url := fmt.Sprintf("https://api.live.bilibili.com/room/v1/Danmu/getConf?room_id=%d&platform=pc&player=web", roomID)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+	req.Header.Set("Referer", "https://live.bilibili.com/")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		host, port = "broadcastlv.chat.bilibili.com", 2243
+		return
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var r struct {
+		Data struct {
+			Token          string `json:"token"`
+			HostServerList []struct {
+				Host string `json:"host"`
+				Port int    `json:"port"`
+			} `json:"host_server_list"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(body, &r) != nil || r.Data.Token == "" {
+		host, port = "broadcastlv.chat.bilibili.com", 2243
+		return
+	}
+	token = r.Data.Token
+	if len(r.Data.HostServerList) > 0 {
+		h := r.Data.HostServerList[rand.Intn(len(r.Data.HostServerList))]
+		host, port = h.Host, h.Port
+	} else {
+		host, port = "broadcastlv.chat.bilibili.com", 2243
+	}
+	return
 }
 
 func processPayload(payload []byte, msgCh chan DanmakuMsg) {
@@ -116,64 +195,45 @@ func processPayload(payload []byte, msgCh chan DanmakuMsg) {
 		if subVer == 3 {
 			subData = brotliDecompress(subData)
 		}
-		if len(subData) > 0 && subData[0] == '{' {
-				log.Printf("[WS-SUB] offset=%d ver=%d JSON=%.80s", offset, subVer, string(subData))
-			} else if len(subData) > 0 {
-				log.Printf("[WS-SUB] offset=%d ver=%d len=%d firstByte=0x%02x", offset, subVer, len(subData), subData[0])
-			}
-			parseMessages(subData, msgCh)
+		parseMessages(subData, msgCh)
 		offset += packLen
 	}
 }
 
 func parseMessages(data []byte, msgCh chan DanmakuMsg) {
 	for _, line := range bytes.Split(data, []byte{'\n'}) {
-		if len(line) == 0 {
-			continue
-		}
+		if len(line) == 0 { continue }
 		var raw struct {
 			Cmd  string          `json:"cmd"`
 			Info []any           `json:"info"`
 			Data json.RawMessage `json:"data"`
 		}
-		if json.Unmarshal(line, &raw) != nil {
-			continue
-		}
-
-		log.Printf("[WS-CMD] %s", raw.Cmd)
-		switch raw.Cmd {
-		case "DANMU_MSG":
+		if json.Unmarshal(line, &raw) != nil { continue }
+		if raw.Cmd != "ONLINE_RANK_COUNT" && raw.Cmd != "ONLINE_RANK_V2" && raw.Cmd != "WATCHED_CHANGE" {
+				log.Printf("[CMD] %s", raw.Cmd)
+			}
+			switch raw.Cmd {
+			case "DANMU_MSG":
 			dm := parseWSdanmu(raw.Info)
 			if dm.Content != "" {
-				select {
-				case msgCh <- dm:
-				default:
-				}
+				select { case msgCh <- dm: default: }
 			}
 		case "SEND_GIFT", "GUARD_BUY", "COMBO_SEND":
 			gift := parseWSgift(raw.Data)
 			if gift.GiftName != "" {
-				select {
-				case msgCh <- gift:
-				default:
-				}
+				log.Printf("[GIFT] %s %s x%d", gift.Username, gift.GiftName, gift.GiftNum)
+				select { case msgCh <- gift: default: }
 			}
-		case "LIVE":
-			SetLive(true)
-		case "PREPARING":
-			SetLive(false)
+		case "LIVE": SetLive(true)
+		case "PREPARING": SetLive(false)
 		}
 	}
 }
 
 func parseWSdanmu(info []any) DanmakuMsg {
-	if len(info) < 3 {
-		return DanmakuMsg{}
-	}
+	if len(info) < 3 { return DanmakuMsg{} }
 	content, _ := info[1].(string)
-	if content == "" {
-		return DanmakuMsg{}
-	}
+	if content == "" { return DanmakuMsg{} }
 	var uid int64; var username string
 	if arr, ok := info[2].([]any); ok && len(arr) >= 2 {
 		if v, ok := arr[0].(float64); ok { uid = int64(v) }
@@ -198,10 +258,8 @@ func parseWSdanmu(info []any) DanmakuMsg {
 
 func parseWSgift(raw json.RawMessage) DanmakuMsg {
 	var gd struct {
-		Uname    string `json:"uname"`
-		GiftName string `json:"giftName"`
-		Num      int    `json:"num"`
-		UID      int64  `json:"uid"`
+		Uname string `json:"uname"`; GiftName string `json:"giftName"`
+		Num int `json:"num"`; UID int64 `json:"uid"`
 	}
 	if json.Unmarshal(raw, &gd) != nil {
 		var str string
@@ -210,17 +268,6 @@ func parseWSgift(raw json.RawMessage) DanmakuMsg {
 	if gd.GiftName == "" || gd.Uname == "" { return DanmakuMsg{} }
 	if gd.Num < 1 { gd.Num = 1 }
 	return DanmakuMsg{UID: gd.UID, Username: gd.Uname, Content: fmt.Sprintf("送出 %s x%d", gd.GiftName, gd.Num), FromCurrent: true, IsGift: true, GiftName: gd.GiftName, GiftNum: gd.Num}
-}
-
-func packWS(op uint32, body []byte) []byte {
-	pkt := make([]byte, 16+len(body))
-	binary.BigEndian.PutUint32(pkt[0:4], uint32(16+len(body)))
-	binary.BigEndian.PutUint16(pkt[4:6], 16)
-	binary.BigEndian.PutUint16(pkt[6:8], 1)
-	binary.BigEndian.PutUint32(pkt[8:12], op)
-	binary.BigEndian.PutUint32(pkt[12:16], 1)
-	copy(pkt[16:], body)
-	return pkt
 }
 
 func brotliDecompress(data []byte) []byte {
