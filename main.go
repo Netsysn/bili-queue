@@ -14,6 +14,7 @@ import (
 var assets embed.FS
 
 var appGlobal *application.App
+var mainWindow *application.WebviewWindow
 
 func init() {
 	application.RegisterEvent[QueueUpdated]("queue:updated")
@@ -48,7 +49,7 @@ func main() {
 
 	appGlobal = app
 
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	mainWindow = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "B站排队助手",
 		Width:            300,
 		Height:           460,

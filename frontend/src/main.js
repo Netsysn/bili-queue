@@ -193,14 +193,18 @@ window.showSettings = async () => {
     initTags('tagHelpTypes', c.help_types||[]);
     initTags('tagServers', c.servers||[]);
     initTags('tagGifts', c.gift_queue||[]);
-    document.getElementById('cfgFocus').checked = c.focus_mode || false;
-    document.body.classList.toggle('focus-mode', c.focus_mode || false);
+    const fm = c.focus_mode || false;
+    document.getElementById('cfgFocus').checked = fm;
+    document.body.classList.toggle('focus-mode', fm);
+    Call.ByName(SVC + '.SetFocusMode', fm);
   } catch(e) {}
 };
 window.hideSettings = () => document.getElementById('settingsModal').classList.add('hidden');
 window.onThemeToggle = () => document.body.classList.toggle('light', document.getElementById('cfgTheme').checked);
 window.toggleFocus = () => {
-  document.body.classList.toggle('focus-mode', document.getElementById('cfgFocus').checked);
+  const on = document.getElementById('cfgFocus').checked;
+  document.body.classList.toggle('focus-mode', on);
+  Call.ByName(SVC + '.SetFocusMode', on);
 };
 window.stepNum = (id, delta) => {
   const el = document.getElementById(id);
