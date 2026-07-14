@@ -1,14 +1,12 @@
-Jul 15 06:29:23.763 INF Build Info: Wails=v3.0.0-alpha2.117 Compiler=go1.25.5 CGO_CXXFLAGS= GOARCH=amd64 GOOS=windows vcs.time=2026-07-14T22:25:54Z vcs.modified=true -buildmode=exe -compiler=gc CGO_ENABLED=1 CGO_CPPFLAGS= CGO_LDFLAGS= GOAMD64=v1 vcs=git vcs.revision=0bed3adcaaee233dd0f8f0796531a7fe1995731e CGO_CFLAGS=
-Jul 15 06:29:23.765 INF AssetServer Info: middleware=true handler=true
-Jul 15 06:29:23.765 INF Platform Info: Go-WebView2Loader=true WebView2=150.0.4078.65 ID=25H2 Name=Windows 10 Pro Version=2009 (Build: 26200) Branding=Windows 11 专业版
-2026/07/15 06:29:23 [WebView2] Environment created successfully
-2026/07/15 06:29:24 [getToken] OK: lXyd0pqFKUbbBEtZ6TxJnyLkUBxYWX0tqLWCp8hz-sbppQC7GdZ3tZKUFSiBBQ94Zu9_6y6tT0y6Ucn_CeWpjSwua-2HKYGoooQUQ-EYkwYulvIm6_5SJTyMpRWaG92UM3KC9Pu_UB1d1zbzijQ6vcVh_eA6r7MyYY6F16uUvI4oF8t9Etql8bu5BFhxWIKa7uRMpZ4Ii1VEFDJ3
-Jul 15 06:29:24.226 INF [AssetFileServerFS] Handling request url=/ file=.
-Jul 15 06:29:24.301 INF [AssetFileServerFS] Handling request url=/assets/index-BlD2qo1R.js file=assets/index-BlD2qo1R.js
-2026/07/15 06:29:24 [RAW] #1 type=*live.MsgHeartbeatReply
-Jul 15 06:29:24.366 INF [AssetFileServerFS] Handling request url=/favicon.ico file=favicon.ico
-2026/07/15 06:29:24 [RAW] #2 MsgGeneral: {"cmd":"LOG_IN_NOTICE","data":{"notice_msg":"为保护用户隐私，未登录无法查看他人昵称","image_web":"http://i0.hdslb.com/bfs/dm/75e7c16b99208df259fe0a93354fd3440cbab412.png","image_app":"http://i0.hdslb.com/bfs/dm/b632f7dcd3acf47deffb5f9ccc9546ae97a3415b.png"}}
-2026/07/15 06:29:31 [RAW] #3 type=*live.MsgWatChed
-2026/07/15 06:29:54 [RAW] #4 type=*live.MsgHeartbeatReply
-Jul 15 06:30:10.651 WRN Window #1 not found
-[0715/063010.670:ERROR:ui\gfx\win\window_impl.cc:172] Failed to unregister class Chrome_WidgetWin_0. Error = 1412
+Jul 15 06:40:02.145 INF Build Info: Wails=v3.0.0-alpha2.117 Compiler=go1.25.5 vcs=git vcs.modified=true -buildmode=exe -compiler=gc CGO_CXXFLAGS= CGO_LDFLAGS= GOARCH=amd64 GOAMD64=v1 vcs.revision=367d1e359710788cf7cb6577ef171c5d3b5cd163 vcs.time=2026-07-14T22:33:10Z CGO_ENABLED=1 CGO_CFLAGS= CGO_CPPFLAGS= GOOS=windows
+Jul 15 06:40:02.148 INF Platform Info: Go-WebView2Loader=true WebView2=150.0.4078.65 ID=25H2 Name=Windows 10 Pro Version=2009 (Build: 26200) Branding=Windows 11 专业版
+Jul 15 06:40:02.148 INF AssetServer Info: middleware=true handler=true
+2026/07/15 06:40:02 [WebView2] Environment created successfully
+Jul 15 06:40:02.676 INF [AssetFileServerFS] Handling request url=/ file=.
+Jul 15 06:40:02.738 INF [AssetFileServerFS] Handling request url=/assets/index-DGhIyXLo.js file=assets/index-DGhIyXLo.js
+Jul 15 06:40:02.890 INF [AssetFileServerFS] Handling request url=/favicon.ico file=favicon.ico
+2026/07/15 06:40:03 [getToken] OK: 7yyT8uI55wSvskAsaWxLCOB6Iu4VUQAchPsER7x0ey9codCmqOsumrRxOn5F1TD-LXt1fzsC-OS51rJ8FKIZ1vVvDwP6VjMX-ezY2_w00YqjYnwcGokhwxVYrDVVDWKm90pyZ_NkbkAgyddLYIosn0nm-AqK9F7DFLBX7SosUFyPbgkQ0vlUGDwe8uh7nLML5hsVHssWZmTPVYPQ
+2026/07/15 06:40:03 ws: auth sent room=1832484713
+2026/07/15 06:40:03 ws: connected to room 1832484713
+2026/07/15 06:40:03 [WS-SUB] offset=0 ver=0 JSON={"cmd":"POPULAR_RANK_CHANGED","data":{"uid":277396637,"rank":0,"countdown":1201,
+2026/07/15 06:40:03 [WS-CMD] POPULAR_RANK_CHANGED
