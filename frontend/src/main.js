@@ -57,7 +57,7 @@ function renderQueue(items) {
     div.innerHTML = `
       ${face}
       <div class="q-info">
-        <div class="q-name">${esc(item.username)}<span style="color:var(--text-dim);font-size:9px;margin-left:6px">UID:${item.uid}</span>${badges}</div>
+        <div class="q-name">${esc(item.username)}<span class="q-uid">UID:${item.uid}</span>${badges}</div>
         <div class="q-meta"><span class="ht">${esc(item.help_type||'')}</span> ${esc(item.server||'')}</div>
       </div>
       <span class="q-time">${fmtTime(item.joined_at)}</span>
@@ -98,7 +98,7 @@ function renderLogs(items) {
     div.innerHTML = `
       ${face}
       <div class="d-body">
-        <div class="d-user">${esc(item.username)}<span style="color:var(--text-dim);margin-left:6px">UID:${item.uid}</span>${badges}</div>
+        <div class="d-user">${esc(item.username)}<span class="d-uid">UID:${item.uid}</span>${badges}</div>
         <div class="d-msg">${item.content}</div>
       </div>
       <span class="d-time">${fmtTime(item.time)}</span>`;
