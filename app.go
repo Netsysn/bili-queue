@@ -191,11 +191,6 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 
 func (s *AppService) GetQueue() QueueUpdated { return s.buildUpdate() }
 func (s *AppService) Refresh() {}
-func (s *AppService) TestData() {
-	s.manager.Enqueue(1001, "netsysn", "", "排队", "B服", "排队，B服", "狠葱明", 6, 15)
-	s.manager.Enqueue(2002, "小明", "", "帮帮", "官服", "帮帮，官服", "", 0, 3)
-	s.manager.Enqueue(3003, "小红", "", "带带", "未指定", "带带我", "", 0, 0)
-}
 func (s *AppService) Complete()               { s.manager.Complete() }
 func (s *AppService) Start() string {
 	if err := s.manager.Start(); err != nil {
