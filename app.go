@@ -71,6 +71,9 @@ func (s *AppService) ServiceStartup(ctx context.Context, opts application.Servic
 	s.stopCh = make(chan struct{})
 
 	cfg := getConfig()
+	if cfg.Cookie != "" {
+		danmaku.SetCookie(cfg.Cookie)
+	}
 	s.manager = queue.New(func(entries []queue.Entry, logs []queue.DanmakuLog) {
 		s.emit(entries, logs)
 	}, cfg.TimeoutMinutes)
@@ -226,6 +229,8 @@ func (s *AppService) SaveConfig(c Config) {
 		cfg.WindowOpacity = c.WindowOpacity
 		cfg.PayMode = c.PayMode
 		cfg.FocusMode = c.FocusMode
+		cfg.Cookie = c.Cookie
+		danmaku.SetCookie(c.Cookie)
 		if len(c.HelpTypes) > 0 { cfg.HelpTypes = c.HelpTypes }
 		if len(c.Servers) > 0   { cfg.Servers = c.Servers }
 		if len(c.GiftQueue) > 0 { cfg.GiftQueue = c.GiftQueue }

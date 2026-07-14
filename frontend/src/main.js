@@ -190,6 +190,7 @@ window.showSettings = async () => {
     initTags('tagHelpTypes', c.help_types||[]);
     initTags('tagServers', c.servers||[]);
     initTags('tagGifts', c.gift_queue||[]);
+    document.getElementById('cfgCookie').value = c.cookie || '';
     const fm = c.focus_mode || false;
     document.getElementById('cfgFocus').checked = fm;
     document.body.classList.toggle('focus-mode', fm);
@@ -222,6 +223,7 @@ window.saveSettings = async () => {
     theme: document.getElementById('cfgTheme').checked ? 'light' : 'dark',
     room_id: parseInt(document.getElementById('cfgRoom').value) || 1926788042,
     pay_mode: document.getElementById('cfgPayMode').checked,
+    cookie: document.getElementById('cfgCookie').value || '',
     focus_mode: document.getElementById('cfgFocus').checked,
     timeout_minutes: parseInt(document.getElementById('cfgTimeout').value) || 5,
     help_types: getTags('tagHelpTypes'),
