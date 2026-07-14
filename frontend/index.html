@@ -234,6 +234,20 @@
   <div class="shortcut" onclick="act('Skip')"><kbd>Ctrl+S</kbd> 跳过</div>
   <div class="shortcut" onclick="restoreTimeout()"><kbd>Ctrl+R</kbd> 恢复</div>
 </div>
+<!-- Cookie 帮助 -->
+<div class="modal-overlay hidden" id="cookieHelpModal" onclick="hideCookieHelp()">
+  <div class="modal-box" onclick="event.stopPropagation()" style="text-align:left;max-width:240px">
+    <p style="font-weight:600;margin-bottom:6px">如何获取 Cookie</p>
+    <p style="font-size:10px;color:var(--text-muted);line-height:1.6;margin-bottom:8px">
+      1. 浏览器打开 bilibili.com 并登录<br>
+      2. 按 F12 → Application → Cookies → bilibili.com<br>
+      3. 找到 SESSDATA，复制值粘贴<br>
+      4. 保存设置，重启 BiliQueue
+    </p>
+    <div class="modal-btns"><button onclick="hideCookieHelp()">知道了</button></div>
+  </div>
+</div>
+
 <!-- 关闭确认 -->
 <div class="modal-overlay hidden" id="closeModal">
   <div class="modal-box"><p>确定要关闭排队助手吗？</p>
