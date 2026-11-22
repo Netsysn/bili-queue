@@ -1,85 +1,89 @@
-// Package intent 弹幕排队意图识别 + 帮类型/服务器提取。
+// Package intent 识别弹幕中的排队请求并提取类型与服务器。
 package intent
 
 import (
 	"regexp"
 	"strings"
+	"unicode"
 )
 
-var denyPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`[怎咋哪]`),
-	regexp.MustCompile(`\?|？`),
-	regexp.MustCompile(`吗`),
-	regexp.MustCompile(`[这那][^排]{3,6}排`), // "这么牛逼的排队"，中间不能含"排"，不杀"那我排一排"
-	regexp.MustCompile(`排队.{0,3}(真|太|烂)`), // "排队系统真烂"
-	regexp.MustCompile(`如何`),
-	regexp.MustCompile(`什么`),
-	regexp.MustCompile(`多少|几个|多久`),
-	regexp.MustCompile(`啥`),
-	regexp.MustCompile(`有什么|有啥`),
-	regexp.MustCompile(`有人说|听人说|听说`),
-	regexp.MustCompile(`(?i)sb|傻逼|垃圾|废物|ntmd|cnm|草泥马`),
-	regexp.MustCompile(`按理|其实|应该|话说`),
-	regexp.MustCompile(`[说讲]话`),
-	regexp.MustCompile(`可以.{0,3}[吗?？]`),
-	regexp.MustCompile(`插队`),
-	regexp.MustCompile(`不.{0,2}排`),
-	regexp.MustCompile(`排队中`),
-	regexp.MustCompile(`已经`),
-	regexp.MustCompile(`人数`),
-	regexp.MustCompile(`是不是`),
+// 明确的取消、否定、状态查询和讨论不应触发入队。
+var rejectPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`取消.{0,4}(排队|上车)|退出.{0,4}(排队|队列)|不想.{0,4}(排|上车|帮|带)`),
+	regexp.MustCompile(`不.{0,3}(排队|排了|排个|排一|上车|帮|带)|别.{0,3}(排队|上车|帮|带)`),
+	regexp.MustCompile(`(怎么|咋|如何|哪里|在哪|去哪).{0,5}(排队|排|上车)`),
+	regexp.MustCompile(`(多少|几个|多久|几位|人数|第几|还有没有).{0,8}(排队|队列|排|上车)|(排队|队列).{0,5}(多少|几个人|多久|人数|规则|系统)`),
+	regexp.MustCompile(`(已经|正在|刚刚|刚才).{0,4}(排队|排过|上车)|(排队中|排过了|排好了)`),
+	regexp.MustCompile(`(听说|有人说|听人说|插队)`),
+	regexp.MustCompile(`(?i)傻逼|垃圾|废物|ntmd|cnm|草泥马`),
 }
 
-// Match 匹配弹幕中的帮类型和服务器。
-// 返回 (helpType, server, matched)。
-// 匹配到帮类型就算排队意图；服务器可选，没匹配到时 server 为空。
+// “我能排队吗”是请求；“有人排队吗”则通常是在询问。
+var personalRequest = regexp.MustCompile(`(我|俺|本人).{0,8}(排队|排个|排一|排下|帮|带|上车|求带)`)
+var questionWord = regexp.MustCompile(`[?？吗]|(是不是|能不能|可不可以|有没有|什么|啥)`)
+
+var fuzzyMap = map[string]*regexp.Regexp{
+	"排队": regexp.MustCompile(`排(?:个队|一排|一下|下|了|个号|个位置)`),
+	"帮帮": regexp.MustCompile(`帮(?:帮我|我一下|我一把|一下|个忙)`),
+	"带带": regexp.MustCompile(`带(?:带我|我一下|我一把|一下|我玩|个我)`),
+	"上车": regexp.MustCompile(`上(?:车|船)`),
+}
+
+// normalize 将全角英数和空格归一化，使 B服、ｂ服等写法一致。
+func normalize(s string) string {
+	return strings.ToLower(strings.Map(func(r rune) rune {
+		switch {
+		case r >= '！' && r <= '～':
+			return r - 0xFEE0
+		case unicode.IsSpace(r):
+			return ' '
+		case r == '\u200b' || r == '\ufeff':
+			return -1
+		default:
+			return r
+		}
+	}, strings.TrimSpace(s)))
+}
+
+// Match 返回命中的配置值。服务器可选；空关键词不会匹配任何内容。
 func Match(text string, helpTypes, servers []string) (string, string, bool) {
-	text = strings.TrimSpace(text)
+	text = normalize(text)
 	if text == "" {
 		return "", "", false
 	}
-	if isNegative(text) {
-		return "", "", false
-	}
-
-	ht := matchOne(text, helpTypes)
-	if ht == "" {
-		return "", "", false
-	}
-
-	sv := matchOne(text, servers)
-	return ht, sv, true
-}
-
-// isNegative 检查是否为否定/疑问/闲聊（复用之前的 deny 逻辑）。
-func isNegative(text string) bool {
-	for _, pat := range denyPatterns {
-		if pat.MatchString(text) {
-			return true
+	for _, pattern := range rejectPatterns {
+		if pattern.MatchString(text) {
+			return "", "", false
 		}
 	}
-	return false
+	if questionWord.MatchString(text) && !personalRequest.MatchString(text) {
+		return "", "", false
+	}
+	helpType := matchOne(text, helpTypes, true)
+	if helpType == "" {
+		return "", "", false
+	}
+	return helpType, matchOne(text, servers, false), true
 }
 
-// matchOne 在文本中查找第一个匹配的关键词，返回原始配置值。
-// 帮类型模糊匹配变体
-var fuzzyMap = map[string]*regexp.Regexp{
-	"排队": regexp.MustCompile(`排[个一队].|排一排|排一下|排了`),
-	"帮帮": regexp.MustCompile(`帮[帮我].|帮一下|帮个忙`),
-	"带带": regexp.MustCompile(`带[带我].|带一下|带个`),
-	"上车": regexp.MustCompile(`上[车船]`),
-}
-
-func matchOne(text string, keywords []string) string {
-	lower := strings.ToLower(text)
-	for _, kw := range keywords {
-		// 精确子串
-		if strings.Contains(lower, strings.ToLower(kw)) {
-			return kw
+// 优先选择最长的精确关键词；仅帮类型使用预定义的口语变体。
+func matchOne(text string, keywords []string, fuzzy bool) string {
+	best, bestLen := "", 0
+	for _, keyword := range keywords {
+		normalized := normalize(keyword)
+		if normalized == "" {
+			continue
 		}
-		// 模糊变体
-		if re, ok := fuzzyMap[kw]; ok && re.MatchString(text) {
-			return kw
+		if strings.Contains(text, normalized) && len([]rune(normalized)) > bestLen {
+			best, bestLen = keyword, len([]rune(normalized))
+		}
+	}
+	if best != "" || !fuzzy {
+		return best
+	}
+	for _, keyword := range keywords {
+		if re := fuzzyMap[normalize(keyword)]; re != nil && re.MatchString(text) {
+			return keyword
 		}
 	}
 	return ""

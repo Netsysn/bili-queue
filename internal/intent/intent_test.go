@@ -46,3 +46,46 @@ func TestMatch(t *testing.T) {
 		}
 	}
 }
+
+func TestMatchRegressions(t *testing.T) {
+	help := []string{"", "排队", "帮帮", "带带", "求带", "上车"}
+	servers := []string{"", "B服", "官服", "官服一区"}
+	tests := []struct {
+		text, help, server string
+		matched            bool
+	}{
+		{"天气真好", "", "", false},
+		{"取消排队", "", "", false},
+		{"我不想排队了", "", "", false},
+		{"我已经排队了", "", "", false},
+		{"怎么排队", "", "", false},
+		{"排队有多少人", "", "", false},
+		{"有人排队吗", "", "", false},
+		{"我可以排队吗？", "排队", "", true},
+		{"我能排个队吗", "排队", "", true},
+		{"麻烦帮帮我", "帮帮", "", true},
+		{"带我一下，ｂ服", "带带", "B服", true},
+		{"排下 官服一区", "排队", "官服一区", true},
+		{"排队 官服", "排队", "官服", true},
+		{"排除故障", "", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.text, func(t *testing.T) {
+			h, s, ok := Match(tt.text, help, servers)
+			if h != tt.help || s != tt.server || ok != tt.matched {
+				t.Errorf("got (%q,%q,%v), want (%q,%q,%v)", h, s, ok, tt.help, tt.server, tt.matched)
+			}
+		})
+	}
+}
+
+func TestMatchEmptyKeywordsAndLiteralPriority(t *testing.T) {
+	h, _, ok := Match("排队", []string{"", "排队"}, nil)
+	if !ok || h != "排队" {
+		t.Fatalf("empty keyword matched: %q, %v", h, ok)
+	}
+	h, _, ok = Match("求带", []string{"带带", "求带"}, nil)
+	if !ok || h != "求带" {
+		t.Fatalf("literal lost to fuzzy match: %q, %v", h, ok)
+	}
+}
