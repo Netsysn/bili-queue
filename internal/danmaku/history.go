@@ -196,10 +196,6 @@ func (h *HistoryFetcher) fetch() {
 		}
 
 		content := dm.Text
-		if dm.Reply.ReplyType == 1 && dm.Reply.ReplyUname != "" {
-			content = "<b>@" + dm.Reply.ReplyUname + "</b> " + content
-		}
-
 		if dm.Emots != nil {
 			for name, em := range dm.Emots {
 				if em.URL != "" {
@@ -221,7 +217,7 @@ func (h *HistoryFetcher) fetch() {
 		select {
 		case h.msgCh <- DanmakuMsg{
 			UID: dm.UID, Username: username, Avatar: avatar,
-			Content: content, FromCurrent: !h.streamStart.IsZero() && !t.Before(h.streamStart),
+			Content: content, ReplyTo: strings.TrimSpace(dm.Reply.ReplyUname), FromCurrent: !h.streamStart.IsZero() && !t.Before(h.streamStart),
 			MedalName: medalName, MedalLevel: medalLevel,
 			UserLevel: userLevel, Vip: dm.Vip,
 		}:

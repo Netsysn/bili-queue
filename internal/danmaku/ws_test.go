@@ -90,3 +90,27 @@ func TestProcessFrameReadsAllPackets(t *testing.T) {
 		t.Fatalf("unexpected messages: %+v %+v", first, second)
 	}
 }
+
+func TestParseDMReply(t *testing.T) {
+	tests := []struct {
+		name     string
+		metadata any
+		want     string
+	}{
+		{"extra json", map[string]any{"extra": `{"show_reply":true,"reply_uname":"小明"}`}, "小明"},
+		{"metadata fallback", map[string]any{"reply_uname": "小红"}, "小红"},
+		{"malformed extra", map[string]any{"extra": "{"}, ""},
+		{"missing", nil, ""},
+		{"untrusted name retained as text", map[string]any{"extra": `{"reply_uname":"<img onerror=alert(1)>"}`}, "<img onerror=alert(1)>"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			meta := make([]any, 16)
+			meta[15] = tt.metadata
+			msg := parseDM([]any{meta, "帮帮我", []any{float64(123), "观众"}})
+			if msg.ReplyTo != tt.want || msg.Content != "帮帮我" {
+				t.Fatalf("unexpected parsed message: %+v", msg)
+			}
+		})
+	}
+}

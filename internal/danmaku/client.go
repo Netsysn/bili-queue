@@ -10,6 +10,7 @@ type DanmakuMsg struct {
 	Username    string
 	Avatar      string
 	Content     string
+	ReplyTo     string
 	FromCurrent bool
 	MedalName   string
 	MedalLevel  int

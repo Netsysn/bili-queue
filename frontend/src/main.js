@@ -137,7 +137,15 @@ function renderLogs(items) {
         <div class="d-msg"></div>
       </div>
       <span class="d-time">${fmtTime(item.time)}</span>`;
-    renderMessage(div.querySelector('.d-msg'), item.content);
+    const message = div.querySelector('.d-msg');
+    const replyTo = (item.reply_to || '').trim();
+    const content = item.content || '';
+    if (replyTo && !content.trimStart().startsWith('@' + replyTo)) {
+      const reply = document.createElement('b');
+      reply.textContent = '@' + replyTo;
+      message.append(reply, document.createTextNode(' '));
+    }
+    renderMessage(message, content);
     page.appendChild(div);
   });
   // 专注模式未 hover 时强制滚到底部

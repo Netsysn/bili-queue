@@ -285,7 +285,7 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 
 	s.manager.AddLog(queue.DanmakuLog{
 		UID: msg.UID, Username: msg.Username, Avatar: avatar,
-		Content: msg.Content, Time: time.Now(),
+		Content: msg.Content, ReplyTo: msg.ReplyTo, Time: time.Now(),
 		IsQueue: matched, FromCurrent: msg.FromCurrent,
 		HelpType: ht, Server: sv,
 		MedalName: msg.MedalName, MedalLevel: msg.MedalLevel,
@@ -443,7 +443,7 @@ func (s *AppService) buildUpdate() QueueUpdated {
 		}
 		litems[i] = LogItem{
 			UID: l.UID, Username: l.Username, Avatar: l.Avatar,
-			Content: l.Content, Time: l.Time.Format("15:04:05"),
+			Content: l.Content, ReplyTo: l.ReplyTo, Time: l.Time.Format("15:04:05"),
 			IsQueue: l.IsQueue, FromCurrent: l.FromCurrent, IsFirstNew: isFirstNew,
 			MedalName: l.MedalName, MedalLevel: l.MedalLevel, UserLevel: l.UserLevel,
 			IsGift: l.IsGift, GiftName: l.GiftName, GiftNum: l.GiftNum,

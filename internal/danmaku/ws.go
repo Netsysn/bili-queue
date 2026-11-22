@@ -438,7 +438,34 @@ func parseDM(info []any) DanmakuMsg {
 			}
 		}
 	}
-	return DanmakuMsg{UID: uid, Username: username, Content: content, FromCurrent: true, MedalName: mn, MedalLevel: ml, UserLevel: ul}
+	return DanmakuMsg{UID: uid, Username: username, Content: content, ReplyTo: parseReplyName(info), FromCurrent: true, MedalName: mn, MedalLevel: ml, UserLevel: ul}
+}
+
+// B 站将回复对象放在 info[0][15].extra（JSON 字符串）中。
+func parseReplyName(info []any) string {
+	if len(info) == 0 {
+		return ""
+	}
+	meta, ok := info[0].([]any)
+	if !ok || len(meta) <= 15 {
+		return ""
+	}
+	details, ok := meta[15].(map[string]any)
+	if !ok {
+		return ""
+	}
+	if extra, ok := details["extra"].(string); ok && extra != "" {
+		var reply struct {
+			Name string `json:"reply_uname"`
+		}
+		if json.Unmarshal([]byte(extra), &reply) == nil && strings.TrimSpace(reply.Name) != "" {
+			return strings.TrimSpace(reply.Name)
+		}
+	}
+	if name, ok := details["reply_uname"].(string); ok {
+		return strings.TrimSpace(name)
+	}
+	return ""
 }
 
 func parseGift(raw json.RawMessage) DanmakuMsg {
