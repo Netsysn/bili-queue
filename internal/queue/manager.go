@@ -185,6 +185,7 @@ func (m *Manager) Restore(index int) {
 	m.mu.Lock()
 	if index >= 0 && index < len(m.items) && m.items[index].Status == StatusTimeout {
 		m.items[index].Status = StatusActive
+		m.items[index].JoinedAt = time.Now()
 	}
 	m.mu.Unlock()
 	m.emitSafe()
