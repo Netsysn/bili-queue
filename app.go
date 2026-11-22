@@ -69,6 +69,7 @@ type AppService struct {
 	statusMu         sync.RWMutex
 	connectionStatus string
 	store            *queueStore
+	avatarSlots      chan struct{}
 }
 
 func (s *AppService) ServiceStartup(ctx context.Context, opts application.ServiceOptions) error {
@@ -76,6 +77,7 @@ func (s *AppService) ServiceStartup(ctx context.Context, opts application.Servic
 	s.msgCh = make(chan danmaku.DanmakuMsg, 512)
 	s.stopCh = make(chan struct{})
 	s.reconnectCh = make(chan struct{}, 1)
+	s.avatarSlots = make(chan struct{}, 8)
 	s.connectionStatus = "正在连接"
 
 	cfg := getConfig()
@@ -257,9 +259,6 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 		sv = "未指定" // 有帮类型没服务器，标记待问
 	}
 	avatar := msg.Avatar
-	if avatar == "" {
-		avatar = danmaku.GetAvatar(msg.UID)
-	}
 
 	s.manager.AddLog(queue.DanmakuLog{
 		UID: msg.UID, Username: msg.Username, Avatar: avatar,
@@ -273,6 +272,23 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 	if matched && msg.FromCurrent {
 		s.manager.Enqueue(msg.UID, msg.Username, avatar, ht, sv, msg.Content,
 			msg.MedalName, msg.MedalLevel, msg.UserLevel)
+	}
+	if avatar == "" && msg.UID > 0 {
+		select {
+		case s.avatarSlots <- struct{}{}:
+			go func(uid int64) {
+				defer func() { <-s.avatarSlots }()
+				if url := danmaku.GetAvatar(uid); url != "" {
+					select {
+					case <-s.stopCh:
+						return
+					default:
+					}
+					s.manager.UpdateAvatar(uid, url)
+				}
+			}(msg.UID)
+		default:
+		}
 	}
 	// 礼物插队：送了配置的礼物直接入队
 	if msg.IsGift && msg.FromCurrent {

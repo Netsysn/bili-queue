@@ -209,6 +209,28 @@ func (m *Manager) Restore(index int) {
 	m.emitSafe()
 }
 
+// UpdateAvatar fills missing avatars without blocking message processing.
+func (m *Manager) UpdateAvatar(uid int64, url string) {
+	m.mu.Lock()
+	changed := false
+	for i := range m.items {
+		if m.items[i].UID == uid && m.items[i].Avatar == "" {
+			m.items[i].Avatar = url
+			changed = true
+		}
+	}
+	for i := range m.logs {
+		if m.logs[i].UID == uid && m.logs[i].Avatar == "" {
+			m.logs[i].Avatar = url
+			changed = true
+		}
+	}
+	m.mu.Unlock()
+	if changed {
+		m.emitSafe()
+	}
+}
+
 // LoadEntries restores valid queue entries and rebuilds the UID index.
 func (m *Manager) LoadEntries(entries []Entry) {
 	m.mu.Lock()
