@@ -444,6 +444,7 @@ func parseGift(raw json.RawMessage) DanmakuMsg {
 		GiftName string `json:"giftName"`
 		Num      int    `json:"num"`
 		UID      int64  `json:"uid"`
+		TID      string `json:"tid"`
 	}
 	if json.Unmarshal(raw, &gd) != nil {
 		var str string
@@ -457,7 +458,7 @@ func parseGift(raw json.RawMessage) DanmakuMsg {
 	if gd.Num < 1 {
 		gd.Num = 1
 	}
-	return DanmakuMsg{UID: gd.UID, Username: gd.Uname, Content: fmt.Sprintf("送出 %s x%d", gd.GiftName, gd.Num), FromCurrent: true, IsGift: true, GiftName: gd.GiftName, GiftNum: gd.Num}
+	return DanmakuMsg{UID: gd.UID, Username: gd.Uname, Content: fmt.Sprintf("送出 %s x%d", gd.GiftName, gd.Num), FromCurrent: true, IsGift: true, GiftName: gd.GiftName, GiftNum: gd.Num, EventID: giftEventID("ws", gd.TID)}
 }
 
 // parseOpenDM 解析开放平台弹幕 LIVE_OPEN_PLATFORM_DM
@@ -486,6 +487,7 @@ func parseOpenGift(raw json.RawMessage) DanmakuMsg {
 		Uname          string `json:"uname"`
 		GiftName       string `json:"gift_name"`
 		GiftNum        int    `json:"gift_num"`
+		MessageID      string `json:"msg_id"`
 		FansMedalLevel int    `json:"fans_medal_level"`
 		FansMedalName  string `json:"fans_medal_name"`
 	}
@@ -499,6 +501,7 @@ func parseOpenGift(raw json.RawMessage) DanmakuMsg {
 		UID: d.UID, Username: d.Uname,
 		Content:     fmt.Sprintf("送出 %s x%d", d.GiftName, d.GiftNum),
 		FromCurrent: true, IsGift: true, GiftName: d.GiftName, GiftNum: d.GiftNum,
+		EventID:   giftEventID("open", d.MessageID),
 		MedalName: d.FansMedalName, MedalLevel: d.FansMedalLevel,
 	}
 }

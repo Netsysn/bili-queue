@@ -14,12 +14,12 @@ import (
 
 // GiftPoller 通过 HTTP API 轮询收到的礼物列表（需要主播 Cookie）。
 type GiftPoller struct {
-	roomID   int64
-	lastID   string
-	seen     map[string]bool
-	mu       sync.Mutex
-	msgCh    chan DanmakuMsg
-	stopCh   chan struct{}
+	roomID int64
+	lastID string
+	seen   map[string]bool
+	mu     sync.Mutex
+	msgCh  chan DanmakuMsg
+	stopCh chan struct{}
 }
 
 func NewGiftPoller(roomID int64) *GiftPoller {
@@ -105,6 +105,7 @@ func (g *GiftPoller) fetch() {
 			Content:     fmt.Sprintf("送出 %s x%d", item.GiftName, item.GiftNum),
 			FromCurrent: true, IsGift: true,
 			GiftName: item.GiftName, GiftNum: item.GiftNum,
+			EventID: giftEventID("gift-poll", item.ID),
 		}:
 		default:
 		}

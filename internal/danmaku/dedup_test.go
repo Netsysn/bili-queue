@@ -21,3 +21,20 @@ func TestDeduperExpires(t *testing.T) {
 		t.Fatal("expired message was duplicate")
 	}
 }
+
+func TestGiftDedupUsesEventID(t *testing.T) {
+	d := deduper{seen: make(map[messageKey]time.Time)}
+	now := time.Now()
+	msg := DanmakuMsg{UID: 1, IsGift: true, Content: "送出小花 x1", EventID: "ws:one"}
+	if d.duplicateMessage(msg, now) || !d.duplicateMessage(msg, now.Add(time.Second)) {
+		t.Fatal("same event should be deduplicated")
+	}
+	msg.EventID = "ws:two"
+	if d.duplicateMessage(msg, now.Add(time.Second)) {
+		t.Fatal("different event should be retained")
+	}
+	msg.EventID = ""
+	if d.duplicateMessage(msg, now) || d.duplicateMessage(msg, now) {
+		t.Fatal("gift without ID must be retained")
+	}
+}

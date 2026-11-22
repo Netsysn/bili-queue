@@ -263,7 +263,7 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 	if msg.UID == 0 && !msg.IsGift {
 		return
 	}
-	if danmaku.IsDuplicate(msg.UID, msg.Content) {
+	if danmaku.IsDuplicateMessage(msg) {
 		return
 	}
 

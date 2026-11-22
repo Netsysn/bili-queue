@@ -40,3 +40,25 @@ func (d *deduper) duplicate(uid int64, content string, now time.Time) bool {
 func IsDuplicate(uid int64, content string) bool {
 	return messageDeduper.duplicate(uid, content, time.Now())
 }
+
+// 礼物缺少稳定事件 ID 时不按内容去重，避免漏掉真实送礼。
+func (d *deduper) duplicateMessage(msg DanmakuMsg, now time.Time) bool {
+	if msg.IsGift {
+		if msg.EventID == "" {
+			return false
+		}
+		return d.duplicate(0, "gift:"+msg.EventID, now)
+	}
+	return d.duplicate(msg.UID, msg.Content, now)
+}
+
+func IsDuplicateMessage(msg DanmakuMsg) bool {
+	return messageDeduper.duplicateMessage(msg, time.Now())
+}
+
+func giftEventID(source, id string) string {
+	if id == "" {
+		return ""
+	}
+	return source + ":" + id
+}

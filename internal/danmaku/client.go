@@ -18,6 +18,7 @@ type DanmakuMsg struct {
 	IsGift      bool
 	GiftName    string
 	GiftNum     int
+	EventID     string
 }
 
 type Client struct {
