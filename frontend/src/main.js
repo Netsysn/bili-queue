@@ -1,10 +1,12 @@
 import { Window, Events, Call } from '@wailsio/runtime';
+import { isNearBottom } from './scroll.js';
 
 const SVC = 'main.AppService';
 let timeoutIdx = -1;
 let timeoutMins = 5;
 let currentTab = 'queue';
 let queuePaused = false;
+let logsFollowTail = true;
 
 function av(name) {
   if (!name) return '?';
@@ -106,6 +108,9 @@ function renderQueue(items) {
 function renderLogs(items) {
   const page = document.getElementById('danmakuPage');
   const empty = document.getElementById('danmakuEmpty');
+  const visible = !page.classList.contains('hidden');
+  const previousTop = page.scrollTop;
+  if (visible) logsFollowTail = isNearBottom(previousTop, page.clientHeight, page.scrollHeight);
   page.querySelectorAll('.d-item,.d-sep').forEach(e => e.remove());
 
   if (items.length === 0) {
@@ -148,11 +153,13 @@ function renderLogs(items) {
     renderMessage(message, content);
     page.appendChild(div);
   });
-  // 专注模式未 hover 时强制滚到底部
-  if (document.body.classList.contains('focus-mode') && !document.body.matches(':hover')) {
-    page.scrollTop = page.scrollHeight;
-  }
+  if (visible) page.scrollTop = logsFollowTail ? page.scrollHeight : previousTop;
 }
+
+document.getElementById('danmakuPage').addEventListener('scroll', (event) => {
+  const page = event.currentTarget;
+  if (!page.classList.contains('hidden')) logsFollowTail = isNearBottom(page.scrollTop, page.clientHeight, page.scrollHeight);
+});
 
 // ── Tab 切换 ──
 window.switchTab = (tab) => {
@@ -163,6 +170,10 @@ window.switchTab = (tab) => {
   document.getElementById('tabDanmaku').classList.toggle('active', tab === 'danmaku');
   document.getElementById('queueShortcuts').classList.toggle('hidden', tab !== 'queue');
   document.getElementById('queueTools').classList.toggle('hidden', tab !== 'queue');
+  if (tab === 'danmaku' && logsFollowTail) {
+    const page = document.getElementById('danmakuPage');
+    page.scrollTop = page.scrollHeight;
+  }
 };
 
 // ── 快捷操作 ──
