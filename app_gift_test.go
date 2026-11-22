@@ -32,3 +32,18 @@ func TestReplyTargetPreservedInLogsAndDoesNotTriggerQueue(t *testing.T) {
 		t.Fatalf("reply target missing from UI payload: %+v", update.Logs)
 	}
 }
+
+func TestAnonymousDanmakuIsVisibleButNotQueued(t *testing.T) {
+	oldCfg := cfg
+	defer func() { cfg = oldCfg }()
+	cfg = defaultConfig
+	s := &AppService{manager: queue.New(nil, 5), stopCh: make(chan struct{}), avatarSlots: make(chan struct{}, 1)}
+	s.processMsg(danmaku.DanmakuMsg{UID: 0, Username: "匿名用户", FromCurrent: true, Content: "排队"})
+	got := s.buildUpdate()
+	if len(got.Logs) != 1 || got.Logs[0].Content != "排队" {
+		t.Fatal("anonymous message was lost")
+	}
+	if len(got.Queue) != 0 {
+		t.Fatal("anonymous viewer must not be automatically queued")
+	}
+}

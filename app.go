@@ -261,12 +261,8 @@ func (s *AppService) consumeLoop() {
 }
 
 func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
-	// 过滤 B站隐私预览消息（UID=0 是真实消息的预发布版本，后面会跟完整版）
-	// 礼物消息不在此列（来自 raw parse 可能有 UID=0 但仍是有效数据）
-	if msg.UID == 0 && !msg.IsGift {
-		return
-	}
-	if danmaku.IsDuplicateMessage(msg) {
+	// UID 为 0 的隐私弹幕也应显示；没有可靠身份时不参与自动入队。
+	if (msg.UID != 0 || msg.IsGift) && danmaku.IsDuplicateMessage(msg) {
 		return
 	}
 
@@ -275,7 +271,7 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 	}
 	cfg := getConfig()
 	ht, sv, matched := "", "", false
-	if msg.FromCurrent && !cfg.PayMode && !s.manager.IsPaused() {
+	if msg.UID > 0 && msg.FromCurrent && !cfg.PayMode && !s.manager.IsPaused() {
 		ht, sv, matched = intent.Match(msg.Content, cfg.HelpTypes, cfg.Servers)
 	}
 	if matched && sv == "" {
