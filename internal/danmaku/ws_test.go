@@ -145,3 +145,36 @@ func TestWSLoopClosesSilentConnection(t *testing.T) {
 		t.Fatal("silent connection was not closed")
 	}
 }
+
+func TestWSLoopReceivesLaterMessages(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_ = conn.WriteMessage(websocket.BinaryMessage, makePacket(5, []byte(`{"cmd":"LIVE_OPEN_PLATFORM_DM","data":{"uid":1,"msg":"第一条"}}`)))
+		time.Sleep(50 * time.Millisecond)
+		_ = conn.WriteMessage(websocket.BinaryMessage, makePacket(5, []byte(`{"cmd":"LIVE_OPEN_PLATFORM_DM","data":{"uid":2,"msg":"后续弹幕"}}`)))
+	}))
+	defer server.Close()
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages := make(chan DanmakuMsg, 2)
+	stop := make(chan struct{})
+	defer close(stop)
+	go wsLoopWithTimeout(conn, messages, stop, time.Second, 2*time.Second)
+	for _, want := range []string{"第一条", "后续弹幕"} {
+		select {
+		case msg, ok := <-messages:
+			if !ok || msg.Content != want {
+				t.Fatalf("wanted %q, got %+v, open=%v", want, msg, ok)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("later message did not arrive")
+		}
+	}
+}
