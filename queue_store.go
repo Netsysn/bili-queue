@@ -21,6 +21,7 @@ type queueSnapshot struct {
 type queueStore struct {
 	mu         sync.Mutex
 	path, room string
+	legacyPath string
 	last       []byte
 }
 
@@ -30,13 +31,21 @@ func newQueueStore(cfg Config) *queueStore {
 		sum := sha256.Sum256([]byte(cfg.IdentityCode))
 		room = "identity:" + hex.EncodeToString(sum[:])
 	}
-	return &queueStore{path: filepath.Join(exeDir(), "queue_state.json"), room: room}
+	key := sha256.Sum256([]byte(room))
+	return &queueStore{
+		path:       filepath.Join(exeDir(), "queue_state_"+hex.EncodeToString(key[:16])+".json"),
+		legacyPath: filepath.Join(exeDir(), "queue_state.json"),
+		room:       room,
+	}
 }
 
 func (s *queueStore) load() ([]queue.Entry, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	data, err := os.ReadFile(s.path)
+	if os.IsNotExist(err) && s.legacyPath != "" {
+		data, err = os.ReadFile(s.legacyPath)
+	}
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
