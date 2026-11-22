@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,6 +55,7 @@ type QueueUpdated struct {
 	Logs             []LogItem   `json:"logs"`
 	IsLive           bool        `json:"is_live"`
 	LiveKnown        bool        `json:"live_known"`
+	QueuePaused      bool        `json:"queue_paused"`
 	LiveTime         string      `json:"live_time"`
 	TimeoutMinutes   int         `json:"timeout_minutes"`
 	ConnectionStatus string      `json:"connection_status"`
@@ -329,7 +331,28 @@ func (s *AppService) Refresh() {
 	default:
 	}
 }
-func (s *AppService) Complete() { s.manager.Complete() }
+func (s *AppService) Complete()                  { s.manager.Complete() }
+func (s *AppService) SetQueuePaused(paused bool) { s.manager.SetPaused(paused) }
+func (s *AppService) ClearQueue()                { s.manager.Clear() }
+func (s *AppService) MoveQueue(uid string, direction int) bool {
+	id, err := strconv.ParseInt(uid, 10, 64)
+	return err == nil && s.manager.MoveWaiting(id, direction)
+}
+func (s *AppService) RemoveQueue(uid string) bool {
+	id, err := strconv.ParseInt(uid, 10, 64)
+	return err == nil && s.manager.Cancel(id)
+}
+func (s *AppService) AddQueue(uid, username, helpType, server string) string {
+	id, err := strconv.ParseInt(strings.TrimSpace(uid), 10, 64)
+	username = strings.TrimSpace(username)
+	if err != nil || id <= 0 || username == "" {
+		return "请输入有效 UID 和昵称"
+	}
+	if !s.manager.EnqueueManual(id, username, strings.TrimSpace(helpType), strings.TrimSpace(server)) {
+		return "该 UID 已在队列中"
+	}
+	return ""
+}
 func (s *AppService) Start() string {
 	if err := s.manager.Start(); err != nil {
 		return err.Error()
@@ -434,6 +457,7 @@ func (s *AppService) buildUpdate() QueueUpdated {
 	s.statusMu.RUnlock()
 	return QueueUpdated{
 		ConnectionStatus: connectionStatus,
+		QueuePaused:      s.manager.IsPaused(),
 		Queue:            qitems, Logs: litems,
 		IsLive: isLive, LiveKnown: liveKnown, LiveTime: "",
 		TimeoutMinutes: cfg.TimeoutMinutes,

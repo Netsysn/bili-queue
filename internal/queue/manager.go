@@ -56,6 +56,7 @@ type Manager struct {
 	onChange       func([]Entry, []DanmakuLog)
 	timeoutMinutes int
 	stopCh         chan struct{}
+	paused         bool
 }
 
 func New(onChange func([]Entry, []DanmakuLog), timeoutMinutes int) *Manager {
@@ -84,7 +85,19 @@ func (m *Manager) AddLog(log DanmakuLog) {
 }
 
 func (m *Manager) Enqueue(uid int64, username, avatar, helpType, server, message, medalName string, medalLevel, userLevel int) bool {
+	return m.enqueue(uid, username, avatar, helpType, server, message, medalName, medalLevel, userLevel, false)
+}
+
+func (m *Manager) EnqueueManual(uid int64, username, helpType, server string) bool {
+	return m.enqueue(uid, username, "", helpType, server, "手动添加", "", 0, 0, true)
+}
+
+func (m *Manager) enqueue(uid int64, username, avatar, helpType, server, message, medalName string, medalLevel, userLevel int, manual bool) bool {
 	m.mu.Lock()
+	if uid <= 0 || (m.paused && !manual) {
+		m.mu.Unlock()
+		return false
+	}
 	if _, ok := m.uidSet[uid]; ok {
 		m.mu.Unlock()
 		return false
@@ -97,6 +110,44 @@ func (m *Manager) Enqueue(uid int64, username, avatar, helpType, server, message
 	}
 	m.items = append(m.items, entry)
 	m.uidSet[uid] = len(m.items) - 1
+	m.mu.Unlock()
+	m.emitSafe()
+	return true
+}
+
+func (m *Manager) SetPaused(paused bool) {
+	m.mu.Lock()
+	m.paused = paused
+	m.mu.Unlock()
+	m.emitSafe()
+}
+
+func (m *Manager) IsPaused() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.paused
+}
+
+func (m *Manager) Clear() {
+	m.mu.Lock()
+	m.items = nil
+	m.uidSet = make(map[int64]int)
+	m.mu.Unlock()
+	m.emitSafe()
+}
+
+// MoveWaiting only reorders adjacent waiting entries, never the in-progress entry.
+func (m *Manager) MoveWaiting(uid int64, direction int) bool {
+	m.mu.Lock()
+	index, ok := m.uidSet[uid]
+	target := index + direction
+	if !ok || (direction != -1 && direction != 1) || target < 0 || target >= len(m.items) || m.items[index].Status != StatusActive || m.items[target].Status != StatusActive {
+		m.mu.Unlock()
+		return false
+	}
+	m.items[index], m.items[target] = m.items[target], m.items[index]
+	m.uidSet[m.items[index].UID] = index
+	m.uidSet[m.items[target].UID] = target
 	m.mu.Unlock()
 	m.emitSafe()
 	return true
