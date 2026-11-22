@@ -17,6 +17,7 @@ import (
 
 type QueueItem struct {
 	UID        int64  `json:"uid"`
+	UIDText    string `json:"uid_text"`
 	Username   string `json:"username"`
 	Avatar     string `json:"avatar"`
 	Status     int    `json:"status"`
@@ -426,7 +427,7 @@ func (s *AppService) buildUpdate() QueueUpdated {
 			firstFound = true
 		}
 		qitems = append(qitems, QueueItem{
-			UID: e.UID, Username: e.Username, Avatar: e.Avatar, Status: int(e.Status),
+			UID: e.UID, UIDText: strconv.FormatInt(e.UID, 10), Username: e.Username, Avatar: e.Avatar, Status: int(e.Status),
 			IsFirst: isFirst, HelpType: e.HelpType, Server: e.Server,
 			Message: e.Message, JoinedAt: e.JoinedAt.Format("15:04:05"),
 			ElapsedSec: int(time.Since(e.JoinedAt).Seconds()),

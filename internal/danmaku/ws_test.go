@@ -62,3 +62,18 @@ func TestParseGiftEventIDTypes(t *testing.T) {
 		}
 	}
 }
+
+func TestLiveEventsSetRoomState(t *testing.T) {
+	liveStatus.mu.Lock()
+	liveStatus.live, liveStatus.known = false, false
+	liveStatus.mu.Unlock()
+	defer func() { liveStatus.mu.Lock(); liveStatus.live, liveStatus.known = false, false; liveStatus.mu.Unlock() }()
+	parseMessages([]byte(`{"cmd":"LIVE"}`), make(chan DanmakuMsg, 1))
+	if live, known := LiveStatus(); !live || !known {
+		t.Fatal("LIVE event not applied")
+	}
+	parseMessages([]byte(`{"cmd":"PREPARING"}`), make(chan DanmakuMsg, 1))
+	if live, known := LiveStatus(); live || !known {
+		t.Fatal("PREPARING event not applied")
+	}
+}

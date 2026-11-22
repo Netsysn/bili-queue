@@ -95,8 +95,8 @@ function renderQueue(items) {
       ${tag}
       ${startBtn}
       <div class="q-actions">
-        ${item.status === 0 ? `<button onclick="moveQueue('${item.uid}', -1)" title="上移">↑</button><button onclick="moveQueue('${item.uid}', 1)" title="下移">↓</button>` : ''}
-        ${item.status !== 1 ? `<button onclick="removeQueue('${item.uid}')">移除</button>` : ''}
+        ${item.status === 0 ? `<button onclick="moveQueue('${item.uid_text}', -1)" title="上移">↑</button><button onclick="moveQueue('${item.uid_text}', 1)" title="下移">↓</button>` : ''}
+        ${item.status !== 1 ? `<button onclick="removeQueue('${item.uid_text}')">移除</button>` : ''}
       </div>`;
     page.appendChild(div);
   });
