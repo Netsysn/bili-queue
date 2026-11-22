@@ -86,7 +86,7 @@ func (s *AppService) ServiceStartup(ctx context.Context, opts application.Servic
 	s.identityCode = cfg.IdentityCode
 	s.store = newQueueStore(cfg)
 	s.manager = queue.New(func(entries []queue.Entry, logs []queue.DanmakuLog) {
-		if err := s.store.save(s.manager.List()); err != nil {
+		if err := s.store.saveLatest(s.manager.List); err != nil {
 			log.Printf("保存队列: %v", err)
 		}
 		s.emit(entries, logs)

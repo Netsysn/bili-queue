@@ -54,8 +54,13 @@ func (s *queueStore) load() ([]queue.Entry, error) {
 }
 
 func (s *queueStore) save(entries []queue.Entry) error {
+	return s.saveLatest(func() []queue.Entry { return entries })
+}
+
+func (s *queueStore) saveLatest(snapshot func() []queue.Entry) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	entries := snapshot()
 	data, err := json.Marshal(queueSnapshot{Room: s.room, Entries: entries})
 	if err != nil {
 		return err
