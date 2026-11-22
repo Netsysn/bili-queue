@@ -13,6 +13,36 @@ function av(name) {
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function fmtTime(ts) { return ts; }
 
+// 弹幕可以包含表情，但不能把观众输入当作可执行的 HTML。
+function renderMessage(target, content) {
+  const template = document.createElement('template');
+  template.innerHTML = content || '';
+  function append(parent, nodes) {
+    for (const node of nodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        parent.appendChild(document.createTextNode(node.textContent));
+      } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'B') {
+        const bold = document.createElement('b');
+        append(bold, node.childNodes);
+        parent.appendChild(bold);
+      } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'IMG') {
+        try {
+          const url = new URL(node.getAttribute('src'));
+          if (url.protocol !== 'https:' || !/(^|\.)hdslb\.com$/i.test(url.hostname)) continue;
+          const img = document.createElement('img');
+          img.src = url.href;
+          img.referrerPolicy = 'no-referrer';
+          img.style.cssText = 'width:20px;height:20px;vertical-align:middle';
+          parent.appendChild(img);
+        } catch (_) { /* 无效表情地址 */ }
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        parent.appendChild(document.createTextNode(node.outerHTML));
+      }
+    }
+  }
+  append(target, template.content.childNodes);
+}
+
 // ── 渲染排队 ──
 function renderQueue(items) {
   const page = document.getElementById('queuePage');
@@ -45,7 +75,7 @@ function renderQueue(items) {
       tag = `<span class="q-tag tag-current">等待 ${m}:${String(s).padStart(2,'0')}</span>`;
     }
 
-    const face = item.avatar ? `<img src="${item.avatar.replace(/"/g,'&quot;')}" referrerpolicy="no-referrer" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">` : `<div class="q-avatar">${av(item.username)}</div>`;
+    const face = item.avatar ? `<img src="${item.avatar.replace(/"/g,'&quot;')}" referrerpolicy="no-referrer" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">` : `<div class="q-avatar">${esc(av(item.username))}</div>`;
     let badges = '';
     if (item.medal_name) badges += `<span style="background:rgba(52,211,153,0.12);color:#34d399;font-size:8px;padding:1px 4px;border-radius:3px;margin-left:4px">${esc(item.medal_name)} ${item.medal_level}</span>`;
     if (item.user_level > 0) badges += `<span style="background:rgba(251,191,36,0.12);color:#fbbf24;font-size:8px;padding:1px 4px;border-radius:3px;margin-left:3px">UL${item.user_level}</span>`;
@@ -91,7 +121,7 @@ function renderLogs(items) {
 
     const div = document.createElement('div');
     div.className = 'd-item' + (item.is_queue ? ' queue' : '') + (item.is_gift ? ' gift' : '');
-    const face = item.avatar ? `<img src="${item.avatar.replace(/"/g,'&quot;')}" referrerpolicy="no-referrer" style="width:20px;height:20px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">` : `<div class="d-avatar">${av(item.username)}</div>`;
+    const face = item.avatar ? `<img src="${item.avatar.replace(/"/g,'&quot;')}" referrerpolicy="no-referrer" style="width:20px;height:20px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">` : `<div class="d-avatar">${esc(av(item.username))}</div>`;
     let badges = '';
     if (item.medal_name) badges += `<span style="background:rgba(52,211,153,0.10);color:#34d399;font-size:8px;padding:1px 4px;border-radius:2px;margin-left:3px">${esc(item.medal_name)} ${item.medal_level}</span>`;
     if (item.user_level > 0) badges += `<span style="background:rgba(251,191,36,0.10);color:#fbbf24;font-size:8px;padding:1px 4px;border-radius:2px;margin-left:3px">UL${item.user_level}</span>`;
@@ -99,9 +129,10 @@ function renderLogs(items) {
       ${face}
       <div class="d-body">
         <div class="d-user">${esc(item.username)}<span class="d-uid">UID:${item.uid}</span>${badges}</div>
-        <div class="d-msg">${item.content}</div>
+        <div class="d-msg"></div>
       </div>
       <span class="d-time">${fmtTime(item.time)}</span>`;
+    renderMessage(div.querySelector('.d-msg'), item.content);
     page.appendChild(div);
   });
   // 专注模式未 hover 时强制滚到底部
