@@ -37,7 +37,7 @@ func New(roomID int64) *Client {
 func (c *Client) Messages() <-chan DanmakuMsg { return c.msgCh }
 
 func (c *Client) Connect() error {
-	ch, err := connectWS(c.roomID)
+	ch, err := ConnectWS(c.roomID, c.stopCh)
 	if err != nil {
 		return fmt.Errorf("connect: %w", err)
 	}

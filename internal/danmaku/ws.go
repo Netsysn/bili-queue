@@ -2,36 +2,45 @@ package danmaku
 
 import (
 	"bytes"
+	"compress/zlib"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"math/rand"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/andybalholm/brotli"
+	"github.com/gorilla/websocket"
 )
 
-func connectWS(roomID int64) (<-chan DanmakuMsg, error) {
+func ConnectWS(roomID int64, stop <-chan struct{}) (<-chan DanmakuMsg, error) {
 	realID, err := ResolveRoomID(roomID)
 	if err != nil {
 		return nil, err
 	}
 	buvid := getBuvid3()
-	token, host, port := getDanmuInfo(realID)
+	token, host, wssPort := getDanmuInfo(realID)
 	if token == "" {
-		token, host, port = getConfInfo(realID)
+		token, host, wssPort = getConfInfo(realID)
 	}
 
-	addr := fmt.Sprintf("%s:%d", host, port)
-	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
+	// 先试 WSS (443)，失败降级 WS (2244)
+	wssURL := fmt.Sprintf("wss://%s:%d/sub", host, wssPort)
+	wsURL := fmt.Sprintf("ws://%s:%d/sub", host, wsPortFallback(wssPort))
+
+	log.Printf("ws: dialing %s", wssURL)
+	conn, _, err := websocket.DefaultDialer.Dial(wssURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("dial %s: %w", addr, err)
+		log.Printf("ws: WSS failed: %v, trying WS %s", err, wsURL)
+		conn, _, err = websocket.DefaultDialer.Dial(wsURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("websocket dial: %w", err)
+		}
 	}
 
 	auth := map[string]any{
@@ -40,77 +49,139 @@ func connectWS(roomID int64) (<-chan DanmakuMsg, error) {
 		"platform": "danmuji", "type": 2,
 	}
 	ab, _ := json.Marshal(auth)
-	if err := sendTCP(conn, 16, 1, 7, 1, ab); err != nil {
+	if err := sendWS(conn, 7, ab); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("auth: %w", err)
 	}
-	log.Printf("ws: auth sent room=%d host=%s", realID, addr)
+	log.Printf("ws: auth sent room=%d", realID)
 
 	SetLive(true)
 	msgCh := make(chan DanmakuMsg, 512)
-	go tcpLoop(conn, msgCh)
+	go wsLoop(conn, msgCh, stop)
 	return msgCh, nil
 }
 
-func tcpLoop(conn net.Conn, msgCh chan DanmakuMsg) {
+func wsPortFallback(wssPort int) int {
+	if wssPort == 443 {
+		return 2244
+	}
+	return wssPort
+}
+
+// connectWSOpen 通过身份码连接 B站开放平台（对齐 C# bililive_dm）
+func ConnectWSOpen(code string, stop <-chan struct{}) (<-chan DanmakuMsg, int64, string, error) {
+	info, err := getRoomInfoByCode(code)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("bopen: %w", err)
+	}
+
+	log.Printf("bopen: dialing %s", info.Server)
+	conn, _, err := websocket.DefaultDialer.Dial(info.Server, nil)
+	if err != nil {
+		return nil, 0, "", fmt.Errorf("bopen dial: %w", err)
+	}
+
+	// auth_body 是 B站返回的预构建认证包，直接发送
+	if err := sendWS(conn, 7, []byte(info.Auth)); err != nil {
+		conn.Close()
+		return nil, 0, "", fmt.Errorf("bopen auth: %w", err)
+	}
+	log.Printf("bopen: auth sent, room=%d game=%s", info.RoomID, info.GameID)
+
+	SetLive(true)
+	msgCh := make(chan DanmakuMsg, 512)
+	go wsLoop(conn, msgCh, stop)
+	return msgCh, int64(info.RoomID), info.GameID, nil
+}
+
+func wsLoop(conn *websocket.Conn, msgCh chan DanmakuMsg, stop <-chan struct{}) {
 	defer conn.Close()
 	defer close(msgCh)
 	defer SetLive(false)
+	defer log.Printf("[WS] connection closed")
 
+	startTime := time.Now()
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
-		for range ticker.C {
-			sendTCP(conn, 16, 1, 2, 1, []byte{})
+		for {
+			select {
+			case <-ticker.C:
+				if err := sendWS(conn, 2, []byte("{}")); err != nil {
+					conn.Close()
+					return
+				}
+			case <-stop:
+				conn.Close()
+				return
+			case <-done:
+				return
+			}
 		}
 	}()
 
 	for {
-		header := make([]byte, 16)
-		if _, err := io.ReadFull(conn, header); err != nil {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			log.Printf("[WS] read error after %v: %v", time.Since(startTime), err)
 			return
 		}
-		packLen := int(binary.BigEndian.Uint32(header[0:4]))
-		ver := binary.BigEndian.Uint16(header[6:8])
-		op := binary.BigEndian.Uint32(header[8:12])
+		if len(msg) < 16 {
+			continue
+		}
+		packLen := int(binary.BigEndian.Uint32(msg[0:4]))
+		ver := binary.BigEndian.Uint16(msg[6:8])
+		op := binary.BigEndian.Uint32(msg[8:12])
 		bodyLen := packLen - 16
 		if bodyLen < 0 || bodyLen > 1024*1024 {
 			continue
 		}
-		body := make([]byte, bodyLen)
-		if bodyLen > 0 {
-			if _, err := io.ReadFull(conn, body); err != nil {
-				return
-			}
+		if bodyLen > len(msg)-16 {
+			log.Printf("[WS] truncated packet")
+			continue
 		}
+		body := msg[16 : 16+bodyLen]
 		switch op {
 		case 5:
 			if ver == 3 {
-				streamRead(body, msgCh)
+				streamReadBrotli(body, msgCh)
+			} else if ver == 2 {
+				streamReadZlib(body, msgCh)
 			} else {
 				parseMessages(body, msgCh)
 			}
 		case 8:
-			var resp struct{ Code int `json:"code"` }
+			var resp struct {
+				Code int `json:"code"`
+			}
 			json.Unmarshal(body, &resp)
+			log.Printf("[WS] auth reply code=%d", resp.Code)
 			if resp.Code != 0 {
-				log.Printf("ws: auth rejected code=%d", resp.Code)
+				return
 			}
 		case 3:
 			SetLive(true)
+		default:
+			// 静默忽略未知 op
 		}
 	}
 }
 
-func streamRead(compressed []byte, msgCh chan DanmakuMsg) {
+func streamReadBrotli(compressed []byte, msgCh chan DanmakuMsg) {
 	r := brotli.NewReader(bytes.NewReader(compressed))
+	subCount := 0
 	for {
 		header := make([]byte, 16)
 		if _, err := io.ReadFull(r, header); err != nil {
+			if subCount > 0 {
+				log.Printf("[BROTLI] %d sub-packets from %d compressed bytes", subCount, len(compressed))
+			}
 			return
 		}
 		packLen := int(binary.BigEndian.Uint32(header[0:4]))
-		if packLen < 16 {
+		if packLen < 16 || packLen > 1024*1024 {
 			return
 		}
 		bodyLen := packLen - 16
@@ -118,20 +189,61 @@ func streamRead(compressed []byte, msgCh chan DanmakuMsg) {
 		if _, err := io.ReadFull(r, body); err != nil {
 			return
 		}
+		subCount++
 		parseMessages(body, msgCh)
 	}
 }
 
-func sendTCP(conn net.Conn, magic, ver uint16, op, seq uint32, body []byte) error {
+func streamReadZlib(compressed []byte, msgCh chan DanmakuMsg) {
+	data := compressed
+	if len(data) > 2 {
+		data = data[2:]
+	}
+	r, err := zlib.NewReader(bytes.NewReader(data))
+	if err != nil {
+		r, err = zlib.NewReader(bytes.NewReader(compressed))
+		if err != nil {
+			log.Printf("[ZLIB] decompress failed: %v (len=%d)", err, len(compressed))
+			return
+		}
+	}
+	defer r.Close()
+	subCount := 0
+	for {
+		header := make([]byte, 16)
+		if _, err := io.ReadFull(r, header); err != nil {
+			if subCount > 0 {
+				log.Printf("[ZLIB] %d sub-packets from %d compressed bytes", subCount, len(compressed))
+			}
+			return
+		}
+		packLen := int(binary.BigEndian.Uint32(header[0:4]))
+		if packLen < 16 || packLen > 1024*1024 {
+			return
+		}
+		bodyLen := packLen - 16
+		body := make([]byte, bodyLen)
+		if _, err := io.ReadFull(r, body); err != nil {
+			return
+		}
+		subCount++
+		parseMessages(body, msgCh)
+	}
+}
+
+func makePacket(op uint32, body []byte) []byte {
 	pkt := make([]byte, 16+len(body))
 	binary.BigEndian.PutUint32(pkt[0:4], uint32(16+len(body)))
-	binary.BigEndian.PutUint16(pkt[4:6], magic)
-	binary.BigEndian.PutUint16(pkt[6:8], ver)
+	binary.BigEndian.PutUint16(pkt[4:6], 16) // header length
+	binary.BigEndian.PutUint16(pkt[6:8], 1)  // protocol version
 	binary.BigEndian.PutUint32(pkt[8:12], op)
-	binary.BigEndian.PutUint32(pkt[12:16], seq)
+	binary.BigEndian.PutUint32(pkt[12:16], 1) // sequence
 	copy(pkt[16:], body)
-	_, err := conn.Write(pkt)
-	return err
+	return pkt
+}
+
+func sendWS(conn *websocket.Conn, op uint32, body []byte) error {
+	return conn.WriteMessage(websocket.BinaryMessage, makePacket(op, body))
 }
 
 func getBuvid3() string {
@@ -144,7 +256,9 @@ func getBuvid3() string {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	var r struct {
-		Data struct{ B3 string `json:"b_3"` } `json:"data"`
+		Data struct {
+			B3 string `json:"b_3"`
+		} `json:"data"`
 	}
 	if json.Unmarshal(body, &r) == nil && r.Data.B3 != "" {
 		return r.Data.B3
@@ -172,8 +286,9 @@ func getDanmuInfo(roomID int64) (string, string, int) {
 		Data struct {
 			Token    string `json:"token"`
 			HostList []struct {
-				Host string `json:"host"`
-				Port int    `json:"port"`
+				Host    string `json:"host"`
+				Port    int    `json:"port"`
+				WssPort int    `json:"wss_port"`
 			} `json:"host_list"`
 		} `json:"data"`
 	}
@@ -181,17 +296,21 @@ func getDanmuInfo(roomID int64) (string, string, int) {
 		return "", "", 0
 	}
 	h := r.Data.HostList[rand.Intn(len(r.Data.HostList))]
-	return r.Data.Token, h.Host, h.Port
+	wssPort := h.WssPort
+	if wssPort == 0 {
+		wssPort = 443
+	}
+	return r.Data.Token, h.Host, wssPort
 }
 
-func getConfInfo(roomID int64) (token, host string, port int) {
+func getConfInfo(roomID int64) (token, host string, wssPort int) {
 	url := fmt.Sprintf("https://api.live.bilibili.com/room/v1/Danmu/getConf?room_id=%d&platform=pc&player=web", roomID)
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
 	req.Header.Set("Referer", "https://live.bilibili.com/")
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", "broadcastlv.chat.bilibili.com", 2243
+		return "", "broadcastlv.chat.bilibili.com", 443
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
@@ -199,19 +318,24 @@ func getConfInfo(roomID int64) (token, host string, port int) {
 		Data struct {
 			Token          string `json:"token"`
 			HostServerList []struct {
-				Host string `json:"host"`
-				Port int    `json:"port"`
+				Host    string `json:"host"`
+				Port    int    `json:"port"`
+				WssPort int    `json:"wss_port"`
 			} `json:"host_server_list"`
 		} `json:"data"`
 	}
 	if json.Unmarshal(body, &r) != nil || r.Data.Token == "" {
-		return "", "broadcastlv.chat.bilibili.com", 2243
+		return "", "broadcastlv.chat.bilibili.com", 443
 	}
 	if len(r.Data.HostServerList) > 0 {
 		h := r.Data.HostServerList[rand.Intn(len(r.Data.HostServerList))]
-		return r.Data.Token, h.Host, h.Port
+		wssPort := h.WssPort
+		if wssPort == 0 {
+			wssPort = 443
+		}
+		return r.Data.Token, h.Host, wssPort
 	}
-	return r.Data.Token, "broadcastlv.chat.bilibili.com", 2243
+	return r.Data.Token, "broadcastlv.chat.bilibili.com", 443
 }
 
 func parseMessages(data []byte, msgCh chan DanmakuMsg) {
@@ -237,8 +361,25 @@ func parseMessages(data []byte, msgCh chan DanmakuMsg) {
 				default:
 				}
 			}
+		case "LIVE_OPEN_PLATFORM_DM":
+			dm := parseOpenDM(raw.Data)
+			if dm.Content != "" {
+				select {
+				case msgCh <- dm:
+				default:
+				}
+			}
 		case "SEND_GIFT", "GUARD_BUY", "COMBO_SEND":
 			gift := parseGift(raw.Data)
+			if gift.GiftName != "" {
+				log.Printf("[GIFT] %s %s x%d", gift.Username, gift.GiftName, gift.GiftNum)
+				select {
+				case msgCh <- gift:
+				default:
+				}
+			}
+		case "LIVE_OPEN_PLATFORM_SEND_GIFT", "LIVE_OPEN_PLATFORM_GUARD":
+			gift := parseOpenGift(raw.Data)
 			if gift.GiftName != "" {
 				log.Printf("[GIFT] %s %s x%d", gift.Username, gift.GiftName, gift.GiftNum)
 				select {
@@ -250,6 +391,8 @@ func parseMessages(data []byte, msgCh chan DanmakuMsg) {
 			SetLive(true)
 		case "PREPARING":
 			SetLive(false)
+		case "LIVE_OPEN_PLATFORM_INTERACTION_END":
+			log.Printf("[OPEN] stream ended")
 		}
 	}
 }
@@ -320,9 +463,45 @@ func parseGift(raw json.RawMessage) DanmakuMsg {
 	return DanmakuMsg{UID: gd.UID, Username: gd.Uname, Content: fmt.Sprintf("送出 %s x%d", gd.GiftName, gd.Num), FromCurrent: true, IsGift: true, GiftName: gd.GiftName, GiftNum: gd.Num}
 }
 
-func brotliDecompress(data []byte) []byte {
-	r := brotli.NewReader(bytes.NewReader(data))
-	var out bytes.Buffer
-	out.ReadFrom(r)
-	return out.Bytes()
+// parseOpenDM 解析开放平台弹幕 LIVE_OPEN_PLATFORM_DM
+func parseOpenDM(raw json.RawMessage) DanmakuMsg {
+	var d struct {
+		UID            int64  `json:"uid"`
+		Uname          string `json:"uname"`
+		Msg            string `json:"msg"`
+		GuardLevel     int    `json:"guard_level"`
+		FansMedalLevel int    `json:"fans_medal_level"`
+		FansMedalName  string `json:"fans_medal_name"`
+	}
+	if json.Unmarshal(raw, &d) != nil || d.Msg == "" {
+		return DanmakuMsg{}
+	}
+	return DanmakuMsg{
+		UID: d.UID, Username: d.Uname, Content: d.Msg, FromCurrent: true,
+		MedalName: d.FansMedalName, MedalLevel: d.FansMedalLevel,
+	}
+}
+
+// parseOpenGift 解析开放平台礼物 LIVE_OPEN_PLATFORM_SEND_GIFT / LIVE_OPEN_PLATFORM_GUARD
+func parseOpenGift(raw json.RawMessage) DanmakuMsg {
+	var d struct {
+		UID            int64  `json:"uid"`
+		Uname          string `json:"uname"`
+		GiftName       string `json:"gift_name"`
+		GiftNum        int    `json:"gift_num"`
+		FansMedalLevel int    `json:"fans_medal_level"`
+		FansMedalName  string `json:"fans_medal_name"`
+	}
+	if json.Unmarshal(raw, &d) != nil || d.GiftName == "" {
+		return DanmakuMsg{}
+	}
+	if d.GiftNum < 1 {
+		d.GiftNum = 1
+	}
+	return DanmakuMsg{
+		UID: d.UID, Username: d.Uname,
+		Content:     fmt.Sprintf("送出 %s x%d", d.GiftName, d.GiftNum),
+		FromCurrent: true, IsGift: true, GiftName: d.GiftName, GiftNum: d.GiftNum,
+		MedalName: d.FansMedalName, MedalLevel: d.FansMedalLevel,
+	}
 }

@@ -14,19 +14,19 @@ import (
 )
 
 type QueueItem struct {
-	UID          int64  `json:"uid"`
-	Username     string `json:"username"`
-	Avatar       string `json:"avatar"`
-	Status       int    `json:"status"`
-	IsFirst      bool   `json:"is_first"`
-	HelpType     string `json:"help_type"`
-	Server       string `json:"server"`
-	Message      string `json:"message"`
-	JoinedAt     string `json:"joined_at"`
-	ElapsedSec   int    `json:"elapsed_sec"` // 已等待秒数，前端倒计时用
-	MedalName    string `json:"medal_name"`
-	MedalLevel   int    `json:"medal_level"`
-	UserLevel    int    `json:"user_level"`
+	UID        int64  `json:"uid"`
+	Username   string `json:"username"`
+	Avatar     string `json:"avatar"`
+	Status     int    `json:"status"`
+	IsFirst    bool   `json:"is_first"`
+	HelpType   string `json:"help_type"`
+	Server     string `json:"server"`
+	Message    string `json:"message"`
+	JoinedAt   string `json:"joined_at"`
+	ElapsedSec int    `json:"elapsed_sec"` // 已等待秒数，前端倒计时用
+	MedalName  string `json:"medal_name"`
+	MedalLevel int    `json:"medal_level"`
+	UserLevel  int    `json:"user_level"`
 }
 
 type LogItem struct {
@@ -57,12 +57,12 @@ type QueueUpdated struct {
 }
 
 type AppService struct {
-	app     *application.App
-	manager *queue.Manager
-	roomID  int64
-	msgCh   chan danmaku.DanmakuMsg
-	stopCh  chan struct{}
-	hist    *danmaku.HistoryFetcher
+	app          *application.App
+	manager      *queue.Manager
+	roomID       int64
+	identityCode string
+	msgCh        chan danmaku.DanmakuMsg
+	stopCh       chan struct{}
 }
 
 func (s *AppService) ServiceStartup(ctx context.Context, opts application.ServiceOptions) error {
@@ -74,6 +74,8 @@ func (s *AppService) ServiceStartup(ctx context.Context, opts application.Servic
 	if cfg.Cookie != "" {
 		danmaku.SetCookie(cfg.Cookie)
 	}
+	s.roomID = cfg.RoomID
+	s.identityCode = cfg.IdentityCode
 	s.manager = queue.New(func(entries []queue.Entry, logs []queue.DanmakuLog) {
 		s.emit(entries, logs)
 	}, cfg.TimeoutMinutes)
@@ -81,71 +83,106 @@ func (s *AppService) ServiceStartup(ctx context.Context, opts application.Servic
 
 	go s.consumeLoop()
 	go s.wsSource()
-	go s.httpSource()
-	go s.giftSource()
 	return nil
 }
 
 func (s *AppService) ServiceShutdown() {
 	close(s.stopCh)
-	if s.hist != nil {
-		s.hist.Stop()
-	}
 	if s.manager != nil {
 		s.manager.Stop()
 	}
 }
 
 func (s *AppService) wsSource() {
+	pollingStarted := false
+	if s.identityCode == "" {
+		pollingStarted = true
+		go s.httpSource(s.roomID)
+		go s.giftSource(s.roomID)
+	}
 	for {
+		var msgCh <-chan danmaku.DanmakuMsg
+		var stopHeartbeat chan struct{}
+		var err error
+		roomID := s.roomID
+
+		if s.identityCode != "" {
+			var gameID string
+			msgCh, roomID, gameID, err = danmaku.ConnectWSOpen(s.identityCode, s.stopCh)
+			if err == nil {
+				stopHeartbeat = make(chan struct{})
+				danmaku.StartBOpenHeartbeat(gameID, stopHeartbeat)
+			}
+		} else {
+			msgCh, err = danmaku.ConnectWS(roomID, s.stopCh)
+		}
+		if err != nil {
+			log.Printf("WS: %v", err)
+		} else {
+			if !pollingStarted {
+				pollingStarted = true
+				go s.httpSource(roomID)
+				go s.giftSource(roomID)
+			}
+		connectionLoop:
+			for {
+				select {
+				case msg, ok := <-msgCh:
+					if !ok {
+						break connectionLoop
+					}
+					select {
+					case s.msgCh <- msg:
+					default:
+					}
+				case <-s.stopCh:
+					break connectionLoop
+				}
+			}
+			if stopHeartbeat != nil {
+				close(stopHeartbeat)
+			}
+		}
 		select {
 		case <-s.stopCh:
 			return
-		default:
+		case <-time.After(3 * time.Second):
 		}
-		client := danmaku.New(s.roomID)
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			for msg := range client.Messages() {
-				select {
-				case s.msgCh <- msg:
-				default:
-				}
-			}
-		}()
-		if err := client.Connect(); err != nil {
-			log.Printf("WS: %v", err)
-		}
-		<-done
-		time.Sleep(3 * time.Second)
 	}
 }
 
-func (s *AppService) giftSource() {
-	gift := danmaku.NewGiftPoller(s.roomID)
-	go func() {
-		for msg := range gift.Messages() {
+func (s *AppService) giftSource(roomID int64) {
+	gift := danmaku.NewGiftPoller(roomID)
+	go gift.Poll(5 * time.Second)
+	defer gift.Stop()
+	for {
+		select {
+		case msg := <-gift.Messages():
 			select {
 			case s.msgCh <- msg:
 			default:
 			}
+		case <-s.stopCh:
+			return
 		}
-	}()
-	gift.Poll(5 * time.Second)
+	}
 }
 
-func (s *AppService) httpSource() {
-	s.hist = danmaku.NewHistoryFetcher(s.roomID)
-	go func() {
-		for msg := range s.hist.Messages() {
+func (s *AppService) httpSource(roomID int64) {
+	hist := danmaku.NewHistoryFetcher(roomID)
+	go hist.Poll(1500 * time.Millisecond)
+	defer hist.Stop()
+	for {
+		select {
+		case msg := <-hist.Messages():
 			select {
 			case s.msgCh <- msg:
 			default:
 			}
+		case <-s.stopCh:
+			return
 		}
-	}()
-	s.hist.Poll(1500 * time.Millisecond)
+	}
 }
 
 func (s *AppService) consumeLoop() {
@@ -192,7 +229,7 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 		HelpType: ht, Server: sv,
 		MedalName: msg.MedalName, MedalLevel: msg.MedalLevel,
 		UserLevel: msg.UserLevel,
-		IsGift: msg.IsGift, GiftName: msg.GiftName, GiftNum: msg.GiftNum,
+		IsGift:    msg.IsGift, GiftName: msg.GiftName, GiftNum: msg.GiftNum,
 	})
 	if matched && msg.FromCurrent {
 		s.manager.Enqueue(msg.UID, msg.Username, avatar, ht, sv, msg.Content,
@@ -211,17 +248,17 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 }
 
 func (s *AppService) GetQueue() QueueUpdated { return s.buildUpdate() }
-func (s *AppService) Refresh() {}
-func (s *AppService) Complete()               { s.manager.Complete() }
+func (s *AppService) Refresh()               {}
+func (s *AppService) Complete()              { s.manager.Complete() }
 func (s *AppService) Start() string {
 	if err := s.manager.Start(); err != nil {
 		return err.Error()
 	}
 	return ""
 }
-func (s *AppService) Skip()                   { s.manager.Skip() }
-func (s *AppService) Remove(i int)            { s.manager.Remove(i) }
-func (s *AppService) Restore(i int)           { s.manager.Restore(i) }
+func (s *AppService) Skip()         { s.manager.Skip() }
+func (s *AppService) Remove(i int)  { s.manager.Remove(i) }
+func (s *AppService) Restore(i int) { s.manager.Restore(i) }
 
 func (s *AppService) Quit() {
 	if s.app != nil {
@@ -243,15 +280,22 @@ func (s *AppService) SaveConfig(c Config) {
 	updateConfig(func(cfg *Config) {
 		cfg.Theme = c.Theme
 		cfg.RoomID = c.RoomID
+		cfg.IdentityCode = c.IdentityCode
 		cfg.TimeoutMinutes = c.TimeoutMinutes
 		cfg.WindowOpacity = c.WindowOpacity
 		cfg.PayMode = c.PayMode
 		cfg.FocusMode = c.FocusMode
 		cfg.Cookie = c.Cookie
 		danmaku.SetCookie(c.Cookie)
-		if len(c.HelpTypes) > 0 { cfg.HelpTypes = c.HelpTypes }
-		if len(c.Servers) > 0   { cfg.Servers = c.Servers }
-		if len(c.GiftQueue) > 0 { cfg.GiftQueue = c.GiftQueue }
+		if len(c.HelpTypes) > 0 {
+			cfg.HelpTypes = c.HelpTypes
+		}
+		if len(c.Servers) > 0 {
+			cfg.Servers = c.Servers
+		}
+		if len(c.GiftQueue) > 0 {
+			cfg.GiftQueue = c.GiftQueue
+		}
 	})
 }
 
@@ -283,7 +327,7 @@ func (s *AppService) buildUpdate() QueueUpdated {
 			IsFirst: isFirst, HelpType: e.HelpType, Server: e.Server,
 			Message: e.Message, JoinedAt: e.JoinedAt.Format("15:04:05"),
 			ElapsedSec: int(time.Since(e.JoinedAt).Seconds()),
-			MedalName: e.MedalName, MedalLevel: e.MedalLevel, UserLevel: e.UserLevel,
+			MedalName:  e.MedalName, MedalLevel: e.MedalLevel, UserLevel: e.UserLevel,
 		})
 	}
 

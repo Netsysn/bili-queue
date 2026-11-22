@@ -1,0 +1,52 @@
+package danmaku
+
+import (
+	"encoding/binary"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/gorilla/websocket"
+)
+
+func TestWSLoopSkipsTruncatedPacket(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		bad := makePacket(5, nil)
+		binary.BigEndian.PutUint32(bad[:4], 100)
+		_ = conn.WriteMessage(websocket.BinaryMessage, bad)
+		good := makePacket(5, []byte(`{"cmd":"LIVE_OPEN_PLATFORM_DM","data":{"uid":123,"uname":"viewer","msg":"排队"}}`))
+		_ = conn.WriteMessage(websocket.BinaryMessage, good)
+	}))
+	defer server.Close()
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages := make(chan DanmakuMsg, 1)
+	stop := make(chan struct{})
+	defer close(stop)
+	go wsLoop(conn, messages, stop)
+	select {
+	case msg, ok := <-messages:
+		if !ok || msg.UID != 123 || msg.Content != "排队" {
+			t.Fatalf("unexpected message: %+v, open=%v", msg, ok)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for message after truncated packet")
+	}
+}
+
+func TestMakePacket(t *testing.T) {
+	packet := makePacket(7, []byte("auth"))
+	if binary.BigEndian.Uint32(packet[:4]) != uint32(len(packet)) || binary.BigEndian.Uint16(packet[4:6]) != 16 || binary.BigEndian.Uint32(packet[8:12]) != 7 || string(packet[16:]) != "auth" {
+		t.Fatalf("invalid packet: %v", packet)
+	}
+}

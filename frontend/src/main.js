@@ -188,7 +188,7 @@ window.showSettings = async () => {
     const c = await Call.ByName(SVC + '.GetConfig');
     document.getElementById('cfgTheme').checked = c.theme === 'light';
     document.getElementById('cfgPayMode').checked = c.pay_mode || false;
-    document.getElementById('cfgRoom').value = c.room_id;
+    document.getElementById('cfgRoom').value = c.identity_code || c.room_id;
     document.getElementById('cfgTimeout').value = c.timeout_minutes;
     initTags('tagHelpTypes', c.help_types||[]);
     initTags('tagServers', c.servers||[]);
@@ -230,7 +230,8 @@ window.stepNum = (id, delta) => {
 window.saveSettings = async () => {
   const c = {
     theme: document.getElementById('cfgTheme').checked ? 'light' : 'dark',
-    room_id: parseInt(document.getElementById('cfgRoom').value) || 1926788042,
+    room_id: (function() { var v = document.getElementById("cfgRoom").value.trim(); return /^\d+$/.test(v) ? (Number(v) || 1926788042) : 1926788042; })(),
+    identity_code: (function() { var v = document.getElementById("cfgRoom").value.trim(); return v && !/^\d+$/.test(v) ? v : ""; })(),
     pay_mode: document.getElementById('cfgPayMode').checked,
     cookie: document.getElementById('cfgCookie').value || '',
     focus_mode: document.getElementById('cfgFocus').checked,

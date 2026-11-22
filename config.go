@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Theme          string   `json:"theme"`
 	RoomID         int64    `json:"room_id"`
+	IdentityCode   string   `json:"identity_code"` // 主播身份码（优先于 room_id）
 	TimeoutMinutes int      `json:"timeout_minutes"`
 	WindowOpacity  float64  `json:"window_opacity"`
 	HelpTypes      []string `json:"help_types"`
