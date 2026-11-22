@@ -181,6 +181,24 @@ func (m *Manager) Remove(index int) {
 	m.emitSafe()
 }
 
+// Cancel removes a viewer's waiting or timed-out entry, but not an active session.
+func (m *Manager) Cancel(uid int64) bool {
+	m.mu.Lock()
+	index, ok := m.uidSet[uid]
+	if !ok || m.items[index].Status == StatusInProgress {
+		m.mu.Unlock()
+		return false
+	}
+	delete(m.uidSet, uid)
+	m.items = append(m.items[:index], m.items[index+1:]...)
+	for i := index; i < len(m.items); i++ {
+		m.uidSet[m.items[i].UID] = i
+	}
+	m.mu.Unlock()
+	m.emitSafe()
+	return true
+}
+
 func (m *Manager) Restore(index int) {
 	m.mu.Lock()
 	if index >= 0 && index < len(m.items) && m.items[index].Status == StatusTimeout {

@@ -245,6 +245,9 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 		return
 	}
 
+	if msg.FromCurrent && !msg.IsGift && strings.TrimSpace(msg.Content) == "取消排队" {
+		s.manager.Cancel(msg.UID)
+	}
 	cfg := getConfig()
 	ht, sv, matched := "", "", false
 	if msg.FromCurrent && !cfg.PayMode {

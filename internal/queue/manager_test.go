@@ -19,3 +19,21 @@ func TestRestoreResetsTimeout(t *testing.T) {
 		t.Fatal("restored entry timed out immediately")
 	}
 }
+
+func TestCancelWaitingEntry(t *testing.T) {
+	m := New(nil, 5)
+	m.Enqueue(1, "甲", "", "排队", "", "排队", "", 0, 0)
+	m.Enqueue(2, "乙", "", "排队", "", "排队", "", 0, 0)
+	if !m.Cancel(1) || len(m.List()) != 1 || m.List()[0].UID != 2 {
+		t.Fatal("waiting entry not removed")
+	}
+	if err := m.Start(); err != nil {
+		t.Fatal(err)
+	}
+	if m.Cancel(2) {
+		t.Fatal("in-progress entry must not be cancelled")
+	}
+	if m.Cancel(99) {
+		t.Fatal("unknown viewer must not be cancelled")
+	}
+}
