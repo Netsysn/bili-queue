@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="icon.jpg" width="96" alt="BiliQueue 图标">
+  <img src="assets/biliqueue-icon.png" width="96" alt="BiliQueue 图标">
 
   # BiliQueue
 

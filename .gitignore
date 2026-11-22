@@ -36,3 +36,7 @@ Thumbs.db
 # Build artifacts
 build/
 bili_log.txt
+
+# Application icon and its Windows resource
+!assets/biliqueue-icon.ico
+!rsrc.syso
