@@ -67,6 +67,19 @@
   .status-count { font-size:11px; color:var(--text-muted); margin-left:auto; }
   .status-count b { color:var(--accent); font-weight:600; }
 
+  .queue-tools { display:flex; gap:5px; padding:2px 8px 7px; flex-shrink:0; }
+  .queue-tools button, .q-actions button { border:1px solid var(--border); border-radius:4px; background:var(--surface); color:var(--text-muted); font:inherit; font-size:10px; cursor:pointer; padding:4px 8px; }
+  .queue-tools button:hover, .q-actions button:hover { color:var(--accent); border-color:var(--accent); }
+  .queue-tools button.paused { color:var(--warn); }
+  .queue-tools.hidden { display:none; }
+  .q-item { flex-wrap:wrap; }
+  .q-actions { width:100%; display:flex; justify-content:flex-end; gap:4px; }
+  .q-actions button { padding:2px 6px; }
+  .manual-fields { display:grid; gap:8px; margin-bottom:10px; }
+  .manual-fields input { width:100%; padding:6px 8px; border:1px solid var(--border); border-radius:4px; color:var(--text); background:var(--bg); font:inherit; font-size:11px; user-select:text; }
+  body.focus-mode .queue-tools { opacity:0; max-height:0; overflow:hidden; pointer-events:none; padding:0; }
+  body.focus-mode:hover .queue-tools { opacity:1; max-height:40px; pointer-events:auto; padding:2px 8px 7px; }
+
   /* ── 内容区 ── */
   .content { flex:1; overflow-y:auto; overflow-x:hidden; padding:0 8px; display:flex; flex-direction:column; gap:2px; }
   .content::-webkit-scrollbar { width:3px; }
@@ -214,6 +227,12 @@
   <span class="status-count" id="count"></span>
 </div>
 
+<div class="queue-tools" id="queueTools">
+  <button id="pauseQueue" onclick="toggleQueue()">暂停接收</button>
+  <button onclick="showAddQueue()">手动添加</button>
+  <button onclick="showClearQueue()">清空队列</button>
+</div>
+
 <!-- 排队页 -->
 <div class="content" id="queuePage">
   <div class="empty" id="queueEmpty"><div class="empty-icon">+</div><p>弹幕发送「帮类型+服务器」即可加入</p></div>
@@ -245,6 +264,25 @@
       4. 保存设置，重启 BiliQueue
     </p>
     <div class="modal-btns"><button onclick="hideCookieHelp()">知道了</button></div>
+  </div>
+</div>
+
+<!-- 队列操作 -->
+<div class="modal-overlay hidden" id="clearQueueModal">
+  <div class="modal-box"><p>确定清空全部队列吗？</p>
+    <div class="modal-btns"><button onclick="hideClearQueue()">取消</button><button class="danger" onclick="clearQueue()">清空</button></div>
+  </div>
+</div>
+<div class="modal-overlay hidden" id="addQueueModal">
+  <div class="modal-box" style="width:240px"><p>手动添加观众</p>
+    <div class="manual-fields">
+      <input id="addUID" inputmode="numeric" placeholder="UID（必填）" aria-label="UID">
+      <input id="addName" placeholder="昵称（必填）" aria-label="昵称">
+      <input id="addHelp" placeholder="帮类型（选填）" aria-label="帮类型">
+      <input id="addServer" placeholder="服务器（选填）" aria-label="服务器">
+    </div>
+    <p id="addError" style="color:var(--danger);font-size:10px"></p>
+    <div class="modal-btns"><button onclick="hideAddQueue()">取消</button><button onclick="addQueue()">添加</button></div>
   </div>
 </div>
 

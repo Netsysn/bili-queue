@@ -4,6 +4,7 @@ const SVC = 'main.AppService';
 let timeoutIdx = -1;
 let timeoutMins = 5;
 let currentTab = 'queue';
+let queuePaused = false;
 
 function av(name) {
   if (!name) return '?';
@@ -92,7 +93,11 @@ function renderQueue(items) {
       </div>
       <span class="q-time">${fmtTime(item.joined_at)}</span>
       ${tag}
-      ${startBtn}`;
+      ${startBtn}
+      <div class="q-actions">
+        ${item.status === 0 ? `<button onclick="moveQueue('${item.uid}', -1)" title="上移">↑</button><button onclick="moveQueue('${item.uid}', 1)" title="下移">↓</button>` : ''}
+        ${item.status !== 1 ? `<button onclick="removeQueue('${item.uid}')">移除</button>` : ''}
+      </div>`;
     page.appendChild(div);
   });
 }
@@ -149,6 +154,7 @@ window.switchTab = (tab) => {
   document.getElementById('tabQueue').classList.toggle('active', tab === 'queue');
   document.getElementById('tabDanmaku').classList.toggle('active', tab === 'danmaku');
   document.getElementById('queueShortcuts').classList.toggle('hidden', tab !== 'queue');
+  document.getElementById('queueTools').classList.toggle('hidden', tab !== 'queue');
 };
 
 // ── 快捷操作 ──
@@ -174,6 +180,34 @@ document.addEventListener('keydown', (e) => {
   }
   e.preventDefault();
 });
+
+function updateQueueControls(paused) {
+  queuePaused = Boolean(paused);
+  const button = document.getElementById('pauseQueue');
+  button.textContent = queuePaused ? '恢复接收' : '暂停接收';
+  button.classList.toggle('paused', queuePaused);
+}
+window.toggleQueue = () => Call.ByName(SVC + '.SetQueuePaused', !queuePaused);
+window.showClearQueue = () => document.getElementById('clearQueueModal').classList.remove('hidden');
+window.hideClearQueue = () => document.getElementById('clearQueueModal').classList.add('hidden');
+window.clearQueue = async () => { await Call.ByName(SVC + '.ClearQueue'); hideClearQueue(); };
+window.showAddQueue = () => {
+  ['addUID', 'addName', 'addHelp', 'addServer'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('addError').textContent = '';
+  document.getElementById('addQueueModal').classList.remove('hidden');
+  document.getElementById('addUID').focus();
+};
+window.hideAddQueue = () => document.getElementById('addQueueModal').classList.add('hidden');
+window.addQueue = async () => {
+  const values = ['addUID', 'addName', 'addHelp', 'addServer'].map(id => document.getElementById(id).value);
+  try {
+    const error = await Call.ByName(SVC + '.AddQueue', ...values);
+    if (error) document.getElementById('addError').textContent = error;
+    else hideAddQueue();
+  } catch (_) { document.getElementById('addError').textContent = '添加失败，请重试'; }
+};
+window.moveQueue = (uid, direction) => Call.ByName(SVC + '.MoveQueue', uid, direction);
+window.removeQueue = (uid) => Call.ByName(SVC + '.RemoveQueue', uid);
 
 // ── 窗口 ──
 window.showCloseConfirm = () => document.getElementById('closeModal').classList.remove('hidden');
@@ -289,6 +323,7 @@ window.saveSettings = async () => {
   try {
     const data = await Call.ByName(SVC + '.GetQueue');
     if (data.timeout_minutes) timeoutMins = data.timeout_minutes;
+    updateQueueControls(data.queue_paused);
     renderQueue(data.queue || []);
     renderLogs(data.logs || []);
     updateLiveStatus(data.is_live, data.live_known, data.connection_status);
@@ -310,6 +345,7 @@ setInterval(() => {
 Events.On('queue:updated', (event) => {
   const data = event.data;
   if (data && data.timeout_minutes) timeoutMins = data.timeout_minutes;
+  updateQueueControls(data && data.queue_paused);
   renderQueue((data && data.queue) || []);
   renderLogs((data && data.logs) || []);
   updateLiveStatus(data && data.is_live, data && data.live_known, data && data.connection_status);
