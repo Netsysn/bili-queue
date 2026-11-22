@@ -1,5 +1,6 @@
 import { Window, Events, Call } from '@wailsio/runtime';
 import { isNearBottom } from './scroll.js';
+import { messageParts } from './message.js';
 
 const SVC = 'main.AppService';
 let timeoutIdx = -1;
@@ -16,34 +17,23 @@ function av(name) {
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function fmtTime(ts) { return ts; }
 
-// 弹幕可以包含表情，但不能把观众输入当作可执行的 HTML。
-function renderMessage(target, content) {
-  const template = document.createElement('template');
-  template.innerHTML = content || '';
-  function append(parent, nodes) {
-    for (const node of nodes) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        parent.appendChild(document.createTextNode(node.textContent));
-      } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'B') {
-        const bold = document.createElement('b');
-        append(bold, node.childNodes);
-        parent.appendChild(bold);
-      } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'IMG') {
-        try {
-          const url = new URL(node.getAttribute('src'));
-          if (url.protocol !== 'https:' || !/(^|\.)hdslb\.com$/i.test(url.hostname)) continue;
-          const img = document.createElement('img');
-          img.src = url.href;
-          img.referrerPolicy = 'no-referrer';
-          img.style.cssText = 'width:20px;height:20px;vertical-align:middle';
-          parent.appendChild(img);
-        } catch (_) { /* 无效表情地址 */ }
-      } else if (node.nodeType === Node.ELEMENT_NODE) {
-        parent.appendChild(document.createTextNode(node.outerHTML));
-      }
+// 弹幕文本始终作为文本节点，表情 URL 经白名单验证后单独渲染。
+function renderMessage(target, content, emotes) {
+  for (const part of messageParts(content, emotes)) {
+    if (!part.url) {
+      target.appendChild(document.createTextNode(part.text));
+      continue;
     }
+    const img = document.createElement('img');
+    img.src = part.url;
+    img.alt = part.text;
+    img.title = part.text;
+    img.referrerPolicy = 'no-referrer';
+    img.style.cssText = part.large
+      ? 'max-width:56px;max-height:56px;vertical-align:middle;object-fit:contain'
+      : 'width:20px;height:20px;vertical-align:middle;object-fit:contain';
+    target.appendChild(img);
   }
-  append(target, template.content.childNodes);
 }
 
 // ── 渲染排队 ──
@@ -150,7 +140,7 @@ function renderLogs(items) {
       reply.textContent = '@' + replyTo;
       message.append(reply, document.createTextNode(' '));
     }
-    renderMessage(message, content);
+    renderMessage(message, content, item.emotes);
     page.appendChild(div);
   });
   if (visible) page.scrollTop = logsFollowTail ? page.scrollHeight : previousTop;

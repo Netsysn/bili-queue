@@ -178,3 +178,33 @@ func TestWSLoopReceivesLaterMessages(t *testing.T) {
 		}
 	}
 }
+
+func TestParseDMEmotes(t *testing.T) {
+	tests := []struct {
+		name, content    string
+		big              any
+		extra            string
+		wantKey, wantURL string
+	}{
+		{"inline", "你好[笑]", nil, `{"emots":{"[笑]":{"url":"http://i0.hdslb.com/a.png","width":20,"height":20}}}`, "[笑]", "http://i0.hdslb.com/a.png"},
+		{"standalone", "[大笑]", map[string]any{"url": "https://i0.hdslb.com/b.webp", "width": float64(100)}, `{}`, "[大笑]", "https://i0.hdslb.com/b.webp"},
+		{"malformed", "原文", nil, `{`, "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			meta := make([]any, 16)
+			meta[13] = tt.big
+			meta[15] = map[string]any{"extra": tt.extra}
+			msg := parseDM([]any{meta, tt.content, []any{float64(123), "观众"}})
+			if msg.Content != tt.content {
+				t.Fatal("original message text changed")
+			}
+			if tt.wantKey != "" && msg.Emotes[tt.wantKey].URL != tt.wantURL {
+				t.Fatalf("emote missing: %+v", msg.Emotes)
+			}
+			if tt.wantKey == "" && len(msg.Emotes) != 0 {
+				t.Fatalf("unexpected emotes: %+v", msg.Emotes)
+			}
+		})
+	}
+}

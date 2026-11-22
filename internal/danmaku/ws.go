@@ -449,7 +449,43 @@ func parseDM(info []any) DanmakuMsg {
 			}
 		}
 	}
-	return DanmakuMsg{UID: uid, Username: username, Content: content, ReplyTo: parseReplyName(info), FromCurrent: true, MedalName: mn, MedalLevel: ml, UserLevel: ul}
+	return DanmakuMsg{UID: uid, Username: username, Content: content, ReplyTo: parseReplyName(info), Emotes: parseEmotes(info, content), FromCurrent: true, MedalName: mn, MedalLevel: ml, UserLevel: ul}
+}
+
+// B 站将行内表情放在 extra.emots，独立表情放在 info[0][13]。
+func parseEmotes(info []any, content string) map[string]Emote {
+	if len(info) == 0 {
+		return nil
+	}
+	meta, ok := info[0].([]any)
+	if !ok {
+		return nil
+	}
+	var result map[string]Emote
+	if len(meta) > 15 {
+		if details, ok := meta[15].(map[string]any); ok {
+			if extra, ok := details["extra"].(string); ok {
+				var data struct {
+					Emots map[string]Emote `json:"emots"`
+				}
+				if json.Unmarshal([]byte(extra), &data) == nil {
+					result = data.Emots
+				}
+			}
+		}
+	}
+	if len(meta) > 13 {
+		if raw, err := json.Marshal(meta[13]); err == nil {
+			var emote Emote
+			if json.Unmarshal(raw, &emote) == nil && emote.URL != "" && content != "" {
+				if result == nil {
+					result = make(map[string]Emote)
+				}
+				result[content] = emote
+			}
+		}
+	}
+	return result
 }
 
 // B 站将回复对象放在 info[0][15].extra（JSON 字符串）中。

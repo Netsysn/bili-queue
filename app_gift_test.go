@@ -47,3 +47,15 @@ func TestAnonymousDanmakuIsVisibleButNotQueued(t *testing.T) {
 		t.Fatal("anonymous viewer must not be automatically queued")
 	}
 }
+
+func TestEmotesReachFrontendWithoutChangingQueueIntent(t *testing.T) {
+	oldCfg := cfg
+	defer func() { cfg = oldCfg }()
+	cfg = defaultConfig
+	s := &AppService{manager: queue.New(nil, 5), stopCh: make(chan struct{}), avatarSlots: make(chan struct{}, 1)}
+	s.processMsg(danmaku.DanmakuMsg{UID: 837245, Username: "观众", Avatar: "provided", FromCurrent: true, Content: "排队[笑]", Emotes: map[string]danmaku.Emote{"[笑]": {URL: "https://i0.hdslb.com/a.png"}}})
+	result := s.buildUpdate()
+	if len(result.Logs) != 1 || result.Logs[0].Emotes["[笑]"].URL == "" || len(result.Queue) != 1 {
+		t.Fatalf("emote or queue missing: %+v", result)
+	}
+}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -121,12 +120,8 @@ type dmEntry struct {
 		Width  int    `json:"width"`
 		Height int    `json:"height"`
 	} `json:"emoticon"`
-	Emots map[string]struct {
-		URL    string `json:"url"`
-		Width  int    `json:"width"`
-		Height int    `json:"height"`
-	} `json:"emots"`
-	User struct {
+	Emots map[string]Emote `json:"emots"`
+	User  struct {
 		Base struct {
 			Face string `json:"face"`
 		} `json:"base"`
@@ -195,19 +190,13 @@ func (h *HistoryFetcher) fetch() {
 			}
 		}
 
-		content := dm.Text
-		if dm.Emots != nil {
-			for name, em := range dm.Emots {
-				if em.URL != "" {
-					content = replaceEmote(content, name, em.URL, em.Width, em.Height)
-				}
-			}
-		}
+		emotes := dm.Emots
 		if dm.Emoticon.URL != "" && dm.Emoticon.Text != "" {
-			content = replaceEmote(content, dm.Emoticon.Text, dm.Emoticon.URL,
-				dm.Emoticon.Width, dm.Emoticon.Height)
+			if emotes == nil {
+				emotes = make(map[string]Emote)
+			}
+			emotes[dm.Emoticon.Text] = Emote{URL: dm.Emoticon.URL, Width: dm.Emoticon.Width, Height: dm.Emoticon.Height}
 		}
-		content = cleanBrackets(content)
 
 		username := dm.Nickname
 		if dm.UID == 0 || strings.Contains(username, "***") {
@@ -217,7 +206,7 @@ func (h *HistoryFetcher) fetch() {
 		select {
 		case h.msgCh <- DanmakuMsg{
 			UID: dm.UID, Username: username, Avatar: avatar,
-			Content: content, ReplyTo: strings.TrimSpace(dm.Reply.ReplyUname), FromCurrent: !h.streamStart.IsZero() && !t.Before(h.streamStart),
+			Content: dm.Text, Emotes: emotes, ReplyTo: strings.TrimSpace(dm.Reply.ReplyUname), FromCurrent: !h.streamStart.IsZero() && !t.Before(h.streamStart),
 			MedalName: medalName, MedalLevel: medalLevel,
 			UserLevel: userLevel, Vip: dm.Vip,
 		}:
@@ -227,28 +216,4 @@ func (h *HistoryFetcher) fetch() {
 	if len(h.lastSeen) > 5000 {
 		h.lastSeen = make(map[string]bool)
 	}
-}
-
-func replaceEmote(text, name, url string, w, h int) string {
-	if w == 0 {
-		w = 20
-	}
-	if h == 0 {
-		h = 20
-	}
-	url = strings.Replace(url, "http://", "https://", 1)
-	img := fmt.Sprintf(`<img src="%s" referrerpolicy="no-referrer" style="width:%dpx;height:%dpx;vertical-align:middle">`,
-		url, w, h)
-	return strings.ReplaceAll(text, name, img)
-}
-
-var bracketRe = regexp.MustCompile(`\[[^\]]+\]`)
-
-func cleanBrackets(text string) string {
-	return bracketRe.ReplaceAllStringFunc(text, func(s string) string {
-		if strings.Contains(s, "<img") {
-			return s
-		}
-		return s
-	})
 }

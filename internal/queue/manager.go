@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"bili-queue-overlay/internal/danmaku"
 )
 
 type Status int
@@ -30,22 +32,23 @@ type Entry struct {
 }
 
 type DanmakuLog struct {
-	UID         int64     `json:"uid"`
-	Username    string    `json:"username"`
-	Avatar      string    `json:"avatar"`
-	Content     string    `json:"content"`
-	Time        time.Time `json:"time"`
-	IsQueue     bool      `json:"is_queue"`
-	FromCurrent bool      `json:"from_current"`
-	HelpType    string    `json:"help_type,omitempty"`
-	Server      string    `json:"server,omitempty"`
-	MedalName   string    `json:"medal_name"`
-	MedalLevel  int       `json:"medal_level"`
-	UserLevel   int       `json:"user_level"`
-	ReplyTo     string    `json:"reply_to"`
-	IsGift      bool      `json:"is_gift"`
-	GiftName    string    `json:"gift_name"`
-	GiftNum     int       `json:"gift_num"`
+	UID         int64                    `json:"uid"`
+	Username    string                   `json:"username"`
+	Avatar      string                   `json:"avatar"`
+	Content     string                   `json:"content"`
+	Time        time.Time                `json:"time"`
+	IsQueue     bool                     `json:"is_queue"`
+	FromCurrent bool                     `json:"from_current"`
+	HelpType    string                   `json:"help_type,omitempty"`
+	Server      string                   `json:"server,omitempty"`
+	MedalName   string                   `json:"medal_name"`
+	MedalLevel  int                      `json:"medal_level"`
+	UserLevel   int                      `json:"user_level"`
+	ReplyTo     string                   `json:"reply_to"`
+	Emotes      map[string]danmaku.Emote `json:"emotes,omitempty"`
+	IsGift      bool                     `json:"is_gift"`
+	GiftName    string                   `json:"gift_name"`
+	GiftNum     int                      `json:"gift_num"`
 }
 
 type Manager struct {

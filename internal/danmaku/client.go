@@ -5,12 +5,19 @@ import (
 	"log"
 )
 
+type Emote struct {
+	URL    string `json:"url"`
+	Width  int    `json:"width,omitempty"`
+	Height int    `json:"height,omitempty"`
+}
+
 type DanmakuMsg struct {
 	UID         int64
 	Username    string
 	Avatar      string
 	Content     string
 	ReplyTo     string
+	Emotes      map[string]Emote
 	FromCurrent bool
 	MedalName   string
 	MedalLevel  int

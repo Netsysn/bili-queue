@@ -33,22 +33,23 @@ type QueueItem struct {
 }
 
 type LogItem struct {
-	UID         int64  `json:"uid"`
-	Username    string `json:"username"`
-	Avatar      string `json:"avatar"`
-	Content     string `json:"content"`
-	Time        string `json:"time"`
-	IsQueue     bool   `json:"is_queue"`
-	FromCurrent bool   `json:"from_current"`
-	IsFirstNew  bool   `json:"is_first_new"`
-	MedalName   string `json:"medal_name"`
-	MedalLevel  int    `json:"medal_level"`
-	UserLevel   int    `json:"user_level"`
-	ReplyTo     string `json:"reply_to"`
-	IsGift      bool   `json:"is_gift"`
-	HasMedal    bool   `json:"has_medal"` // 有当前直播间粉丝勋章=可插队
-	GiftName    string `json:"gift_name"`
-	GiftNum     int    `json:"gift_num"`
+	UID         int64                    `json:"uid"`
+	Username    string                   `json:"username"`
+	Avatar      string                   `json:"avatar"`
+	Content     string                   `json:"content"`
+	Time        string                   `json:"time"`
+	IsQueue     bool                     `json:"is_queue"`
+	FromCurrent bool                     `json:"from_current"`
+	IsFirstNew  bool                     `json:"is_first_new"`
+	MedalName   string                   `json:"medal_name"`
+	MedalLevel  int                      `json:"medal_level"`
+	UserLevel   int                      `json:"user_level"`
+	ReplyTo     string                   `json:"reply_to"`
+	Emotes      map[string]danmaku.Emote `json:"emotes,omitempty"`
+	IsGift      bool                     `json:"is_gift"`
+	HasMedal    bool                     `json:"has_medal"` // 有当前直播间粉丝勋章=可插队
+	GiftName    string                   `json:"gift_name"`
+	GiftNum     int                      `json:"gift_num"`
 }
 
 type QueueUpdated struct {
@@ -281,7 +282,7 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 
 	s.manager.AddLog(queue.DanmakuLog{
 		UID: msg.UID, Username: msg.Username, Avatar: avatar,
-		Content: msg.Content, ReplyTo: msg.ReplyTo, Time: time.Now(),
+		Content: msg.Content, ReplyTo: msg.ReplyTo, Emotes: msg.Emotes, Time: time.Now(),
 		IsQueue: matched, FromCurrent: msg.FromCurrent,
 		HelpType: ht, Server: sv,
 		MedalName: msg.MedalName, MedalLevel: msg.MedalLevel,
@@ -439,7 +440,7 @@ func (s *AppService) buildUpdate() QueueUpdated {
 		}
 		litems[i] = LogItem{
 			UID: l.UID, Username: l.Username, Avatar: l.Avatar,
-			Content: l.Content, ReplyTo: l.ReplyTo, Time: l.Time.Format("15:04:05"),
+			Content: l.Content, ReplyTo: l.ReplyTo, Emotes: l.Emotes, Time: l.Time.Format("15:04:05"),
 			IsQueue: l.IsQueue, FromCurrent: l.FromCurrent, IsFirstNew: isFirstNew,
 			MedalName: l.MedalName, MedalLevel: l.MedalLevel, UserLevel: l.UserLevel,
 			IsGift: l.IsGift, GiftName: l.GiftName, GiftNum: l.GiftNum,
