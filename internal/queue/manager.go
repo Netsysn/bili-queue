@@ -191,6 +191,24 @@ func (m *Manager) Restore(index int) {
 	m.emitSafe()
 }
 
+// LoadEntries restores valid queue entries and rebuilds the UID index.
+func (m *Manager) LoadEntries(entries []Entry) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.items = nil
+	m.uidSet = make(map[int64]int)
+	for _, entry := range entries {
+		if entry.UID <= 0 || entry.JoinedAt.IsZero() || entry.Status < StatusActive || entry.Status > StatusTimeout || entry.Status == StatusDone {
+			continue
+		}
+		if _, exists := m.uidSet[entry.UID]; exists {
+			continue
+		}
+		m.uidSet[entry.UID] = len(m.items)
+		m.items = append(m.items, entry)
+	}
+}
+
 func (m *Manager) List() []Entry {
 	m.mu.Lock()
 	defer m.mu.Unlock()

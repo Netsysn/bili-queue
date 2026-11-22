@@ -68,6 +68,7 @@ type AppService struct {
 	reconnectCh      chan struct{}
 	statusMu         sync.RWMutex
 	connectionStatus string
+	store            *queueStore
 }
 
 func (s *AppService) ServiceStartup(ctx context.Context, opts application.ServiceOptions) error {
@@ -83,9 +84,18 @@ func (s *AppService) ServiceStartup(ctx context.Context, opts application.Servic
 	}
 	s.roomID = cfg.RoomID
 	s.identityCode = cfg.IdentityCode
+	s.store = newQueueStore(cfg)
 	s.manager = queue.New(func(entries []queue.Entry, logs []queue.DanmakuLog) {
+		if err := s.store.save(s.manager.List()); err != nil {
+			log.Printf("保存队列: %v", err)
+		}
 		s.emit(entries, logs)
 	}, cfg.TimeoutMinutes)
+	if entries, err := s.store.load(); err != nil {
+		log.Printf("恢复队列: %v", err)
+	} else {
+		s.manager.LoadEntries(entries)
+	}
 	s.manager.StartTimeoutChecker()
 
 	go s.consumeLoop()
