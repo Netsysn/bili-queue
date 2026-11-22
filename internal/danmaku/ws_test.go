@@ -114,3 +114,34 @@ func TestParseDMReply(t *testing.T) {
 		})
 	}
 }
+
+func TestWSLoopClosesSilentConnection(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	done := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		<-done
+	}))
+	defer server.Close()
+	defer close(done)
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http"), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages := make(chan DanmakuMsg, 1)
+	stop := make(chan struct{})
+	defer close(stop)
+	go wsLoopWithTimeout(conn, messages, stop, time.Hour, 100*time.Millisecond)
+	select {
+	case _, ok := <-messages:
+		if ok {
+			t.Fatal("unexpected message")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("silent connection was not closed")
+	}
+}

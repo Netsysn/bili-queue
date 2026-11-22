@@ -93,6 +93,10 @@ func ConnectWSOpen(code string, stop <-chan struct{}) (<-chan DanmakuMsg, int64,
 }
 
 func wsLoop(conn *websocket.Conn, msgCh chan DanmakuMsg, stop <-chan struct{}) {
+	wsLoopWithTimeout(conn, msgCh, stop, 20*time.Second, 75*time.Second)
+}
+
+func wsLoopWithTimeout(conn *websocket.Conn, msgCh chan DanmakuMsg, stop <-chan struct{}, heartbeatInterval, readTimeout time.Duration) {
 	defer conn.Close()
 	defer close(msgCh)
 	defer log.Printf("[WS] connection closed")
@@ -101,11 +105,15 @@ func wsLoop(conn *websocket.Conn, msgCh chan DanmakuMsg, stop <-chan struct{}) {
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
-		ticker := time.NewTicker(30 * time.Second)
+		ticker := time.NewTicker(heartbeatInterval)
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
+				if err := conn.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+					conn.Close()
+					return
+				}
 				if err := sendWS(conn, 2, []byte("{}")); err != nil {
 					conn.Close()
 					return
@@ -120,6 +128,9 @@ func wsLoop(conn *websocket.Conn, msgCh chan DanmakuMsg, stop <-chan struct{}) {
 	}()
 
 	for {
+		if err := conn.SetReadDeadline(time.Now().Add(readTimeout)); err != nil {
+			return
+		}
 		_, msg, err := conn.ReadMessage()
 		if err != nil {
 			log.Printf("[WS] read error after %v: %v", time.Since(startTime), err)
