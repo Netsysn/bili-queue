@@ -55,7 +55,6 @@ func ConnectWS(roomID int64, stop <-chan struct{}) (<-chan DanmakuMsg, error) {
 	}
 	log.Printf("ws: auth sent room=%d", realID)
 
-	SetLive(true)
 	msgCh := make(chan DanmakuMsg, 512)
 	go wsLoop(conn, msgCh, stop)
 	return msgCh, nil
@@ -88,7 +87,6 @@ func ConnectWSOpen(code string, stop <-chan struct{}) (<-chan DanmakuMsg, int64,
 	}
 	log.Printf("bopen: auth sent, room=%d game=%s", info.RoomID, info.GameID)
 
-	SetLive(true)
 	msgCh := make(chan DanmakuMsg, 512)
 	go wsLoop(conn, msgCh, stop)
 	return msgCh, int64(info.RoomID), info.GameID, nil
@@ -97,7 +95,6 @@ func ConnectWSOpen(code string, stop <-chan struct{}) (<-chan DanmakuMsg, int64,
 func wsLoop(conn *websocket.Conn, msgCh chan DanmakuMsg, stop <-chan struct{}) {
 	defer conn.Close()
 	defer close(msgCh)
-	defer SetLive(false)
 	defer log.Printf("[WS] connection closed")
 
 	startTime := time.Now()
@@ -162,7 +159,7 @@ func wsLoop(conn *websocket.Conn, msgCh chan DanmakuMsg, stop <-chan struct{}) {
 				return
 			}
 		case 3:
-			SetLive(true)
+			// 心跳回复只代表连接可用，不能判断是否开播。
 		default:
 			// 静默忽略未知 op
 		}

@@ -53,6 +53,7 @@ type QueueUpdated struct {
 	Queue            []QueueItem `json:"queue"`
 	Logs             []LogItem   `json:"logs"`
 	IsLive           bool        `json:"is_live"`
+	LiveKnown        bool        `json:"live_known"`
 	LiveTime         string      `json:"live_time"`
 	TimeoutMinutes   int         `json:"timeout_minutes"`
 	ConnectionStatus string      `json:"connection_status"`
@@ -102,6 +103,7 @@ func (s *AppService) ServiceStartup(ctx context.Context, opts application.Servic
 
 	go s.consumeLoop()
 	go s.wsSource()
+	go s.watchLiveStatus()
 	return nil
 }
 
@@ -186,6 +188,24 @@ func (s *AppService) setConnectionStatus(status string) {
 	s.statusMu.Unlock()
 	if changed && s.manager != nil {
 		s.emit(nil, nil)
+	}
+}
+
+func (s *AppService) watchLiveStatus() {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	var lastLive, lastKnown bool
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		case <-ticker.C:
+			live, known := danmaku.LiveStatus()
+			if live != lastLive || known != lastKnown {
+				lastLive, lastKnown = live, known
+				s.emit(nil, nil)
+			}
+		}
 	}
 }
 
@@ -407,7 +427,7 @@ func (s *AppService) buildUpdate() QueueUpdated {
 			IsGift: l.IsGift, GiftName: l.GiftName, GiftNum: l.GiftNum,
 		}
 	}
-	isLive := danmaku.IsRoomLive()
+	isLive, liveKnown := danmaku.LiveStatus()
 	cfg := getConfig()
 	s.statusMu.RLock()
 	connectionStatus := s.connectionStatus
@@ -415,7 +435,7 @@ func (s *AppService) buildUpdate() QueueUpdated {
 	return QueueUpdated{
 		ConnectionStatus: connectionStatus,
 		Queue:            qitems, Logs: litems,
-		IsLive: isLive, LiveTime: "",
+		IsLive: isLive, LiveKnown: liveKnown, LiveTime: "",
 		TimeoutMinutes: cfg.TimeoutMinutes,
 	}
 }

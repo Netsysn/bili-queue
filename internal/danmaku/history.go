@@ -83,14 +83,16 @@ func (h *HistoryFetcher) refreshLiveTime() {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	var r struct {
+		Code int `json:"code"`
 		Data struct {
 			LiveTime   int64 `json:"live_time"`
 			LiveStatus int   `json:"live_status"`
 		} `json:"data"`
 	}
-	if json.Unmarshal(body, &r) != nil {
+	if json.Unmarshal(body, &r) != nil || r.Code != 0 {
 		return
 	}
+	SetLive(r.Data.LiveStatus == 1)
 	h.mu.Lock()
 	h.IsLive = r.Data.LiveStatus == 1
 	h.mu.Unlock()

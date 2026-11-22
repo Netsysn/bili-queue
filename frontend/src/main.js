@@ -291,7 +291,7 @@ window.saveSettings = async () => {
     if (data.timeout_minutes) timeoutMins = data.timeout_minutes;
     renderQueue(data.queue || []);
     renderLogs(data.logs || []);
-    updateLiveStatus(data.is_live, data.live_time, data.connection_status);
+    updateLiveStatus(data.is_live, data.live_known, data.connection_status);
   } catch (e) {
     document.getElementById('statusDot').classList.remove('live');
     document.getElementById('statusText').textContent = '等待连接...';
@@ -312,20 +312,14 @@ Events.On('queue:updated', (event) => {
   if (data && data.timeout_minutes) timeoutMins = data.timeout_minutes;
   renderQueue((data && data.queue) || []);
   renderLogs((data && data.logs) || []);
-  updateLiveStatus(data && data.is_live, data && data.live_time, data && data.connection_status);
+  updateLiveStatus(data && data.is_live, data && data.live_known, data && data.connection_status);
 });
 
-function updateLiveStatus(isLive, liveTime, connectionStatus) {
+function updateLiveStatus(isLive, liveKnown, connectionStatus) {
   const dot = document.getElementById('statusDot');
   const txt = document.getElementById('statusText');
-  if (connectionStatus !== '连接已建立') {
-    dot.classList.remove('live');
-    txt.textContent = connectionStatus || '等待连接...';
-  } else if (isLive) {
-    dot.classList.add('live');
-    txt.textContent = liveTime ? '开播 ' + liveTime : '监听中';
-  } else {
-    dot.classList.remove('live');
-    txt.textContent = '未开播';
-  }
+  const connection = connectionStatus || '等待连接';
+  const live = !liveKnown ? '直播状态未知' : (isLive ? '直播中' : '未开播');
+  dot.classList.toggle('live', connection === '连接已建立' && liveKnown && isLive);
+  txt.textContent = connection + ' · ' + live;
 }
