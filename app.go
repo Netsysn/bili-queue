@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"bili-queue-overlay/internal/danmaku"
@@ -49,26 +50,32 @@ type LogItem struct {
 }
 
 type QueueUpdated struct {
-	Queue          []QueueItem `json:"queue"`
-	Logs           []LogItem   `json:"logs"`
-	IsLive         bool        `json:"is_live"`
-	LiveTime       string      `json:"live_time"`
-	TimeoutMinutes int         `json:"timeout_minutes"`
+	Queue            []QueueItem `json:"queue"`
+	Logs             []LogItem   `json:"logs"`
+	IsLive           bool        `json:"is_live"`
+	LiveTime         string      `json:"live_time"`
+	TimeoutMinutes   int         `json:"timeout_minutes"`
+	ConnectionStatus string      `json:"connection_status"`
 }
 
 type AppService struct {
-	app          *application.App
-	manager      *queue.Manager
-	roomID       int64
-	identityCode string
-	msgCh        chan danmaku.DanmakuMsg
-	stopCh       chan struct{}
+	app              *application.App
+	manager          *queue.Manager
+	roomID           int64
+	identityCode     string
+	msgCh            chan danmaku.DanmakuMsg
+	stopCh           chan struct{}
+	reconnectCh      chan struct{}
+	statusMu         sync.RWMutex
+	connectionStatus string
 }
 
 func (s *AppService) ServiceStartup(ctx context.Context, opts application.ServiceOptions) error {
 	s.app = appGlobal
 	s.msgCh = make(chan danmaku.DanmakuMsg, 512)
 	s.stopCh = make(chan struct{})
+	s.reconnectCh = make(chan struct{}, 1)
+	s.connectionStatus = "正在连接"
 
 	cfg := getConfig()
 	if cfg.Cookie != "" {
@@ -101,6 +108,8 @@ func (s *AppService) wsSource() {
 		go s.giftSource(s.roomID)
 	}
 	for {
+		s.setConnectionStatus("正在连接")
+		connectionStop := make(chan struct{})
 		var msgCh <-chan danmaku.DanmakuMsg
 		var stopHeartbeat chan struct{}
 		var err error
@@ -108,17 +117,19 @@ func (s *AppService) wsSource() {
 
 		if s.identityCode != "" {
 			var gameID string
-			msgCh, roomID, gameID, err = danmaku.ConnectWSOpen(s.identityCode, s.stopCh)
+			msgCh, roomID, gameID, err = danmaku.ConnectWSOpen(s.identityCode, connectionStop)
 			if err == nil {
 				stopHeartbeat = make(chan struct{})
 				danmaku.StartBOpenHeartbeat(gameID, stopHeartbeat)
 			}
 		} else {
-			msgCh, err = danmaku.ConnectWS(roomID, s.stopCh)
+			msgCh, err = danmaku.ConnectWS(roomID, connectionStop)
 		}
 		if err != nil {
 			log.Printf("WS: %v", err)
+			s.setConnectionStatus("连接失败，正在重试")
 		} else {
+			s.setConnectionStatus("连接已建立")
 			if !pollingStarted {
 				pollingStarted = true
 				go s.httpSource(roomID)
@@ -137,17 +148,32 @@ func (s *AppService) wsSource() {
 					}
 				case <-s.stopCh:
 					break connectionLoop
+				case <-s.reconnectCh:
+					break connectionLoop
 				}
 			}
 			if stopHeartbeat != nil {
 				close(stopHeartbeat)
 			}
 		}
+		close(connectionStop)
+		s.setConnectionStatus("连接已断开，正在重试")
 		select {
 		case <-s.stopCh:
 			return
+		case <-s.reconnectCh:
 		case <-time.After(3 * time.Second):
 		}
+	}
+}
+
+func (s *AppService) setConnectionStatus(status string) {
+	s.statusMu.Lock()
+	changed := s.connectionStatus != status
+	s.connectionStatus = status
+	s.statusMu.Unlock()
+	if changed && s.manager != nil {
+		s.emit(nil, nil)
 	}
 }
 
@@ -248,8 +274,13 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 }
 
 func (s *AppService) GetQueue() QueueUpdated { return s.buildUpdate() }
-func (s *AppService) Refresh()               {}
-func (s *AppService) Complete()              { s.manager.Complete() }
+func (s *AppService) Refresh() {
+	select {
+	case s.reconnectCh <- struct{}{}:
+	default:
+	}
+}
+func (s *AppService) Complete() { s.manager.Complete() }
 func (s *AppService) Start() string {
 	if err := s.manager.Start(); err != nil {
 		return err.Error()
@@ -349,8 +380,12 @@ func (s *AppService) buildUpdate() QueueUpdated {
 	}
 	isLive := danmaku.IsRoomLive()
 	cfg := getConfig()
+	s.statusMu.RLock()
+	connectionStatus := s.connectionStatus
+	s.statusMu.RUnlock()
 	return QueueUpdated{
-		Queue: qitems, Logs: litems,
+		ConnectionStatus: connectionStatus,
+		Queue:            qitems, Logs: litems,
 		IsLive: isLive, LiveTime: "",
 		TimeoutMinutes: cfg.TimeoutMinutes,
 	}

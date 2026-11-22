@@ -182,7 +182,6 @@ window.doClose = () => Call.ByName(SVC + '.Quit').catch(() => Window.Close());
 window.refreshDanmaku = () => {
   Call.ByName(SVC + '.Refresh');
   document.getElementById('statusText').textContent = '刷新中...';
-  setTimeout(() => { document.getElementById('statusText').textContent = '监听中'; }, 2000);
 };
 window.minimizeWin = () => Window.Minimise();
 
@@ -292,7 +291,7 @@ window.saveSettings = async () => {
     if (data.timeout_minutes) timeoutMins = data.timeout_minutes;
     renderQueue(data.queue || []);
     renderLogs(data.logs || []);
-    updateLiveStatus(data.is_live, data.live_time);
+    updateLiveStatus(data.is_live, data.live_time, data.connection_status);
   } catch (e) {
     document.getElementById('statusDot').classList.remove('live');
     document.getElementById('statusText').textContent = '等待连接...';
@@ -313,14 +312,16 @@ Events.On('queue:updated', (event) => {
   if (data && data.timeout_minutes) timeoutMins = data.timeout_minutes;
   renderQueue((data && data.queue) || []);
   renderLogs((data && data.logs) || []);
-  updateLiveStatus(data && data.is_live, data && data.live_time);
+  updateLiveStatus(data && data.is_live, data && data.live_time, data && data.connection_status);
 });
 
-function updateLiveStatus(isLive, liveTime) {
+function updateLiveStatus(isLive, liveTime, connectionStatus) {
   const dot = document.getElementById('statusDot');
   const txt = document.getElementById('statusText');
-  // 调试：把 isLive 直接显示出来
-  if (isLive) {
+  if (connectionStatus !== '连接已建立') {
+    dot.classList.remove('live');
+    txt.textContent = connectionStatus || '等待连接...';
+  } else if (isLive) {
     dot.classList.add('live');
     txt.textContent = liveTime ? '开播 ' + liveTime : '监听中';
   } else {
