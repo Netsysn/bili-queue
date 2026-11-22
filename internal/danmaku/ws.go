@@ -125,21 +125,24 @@ func wsLoop(conn *websocket.Conn, msgCh chan DanmakuMsg, stop <-chan struct{}) {
 			log.Printf("[WS] read error after %v: %v", time.Since(startTime), err)
 			return
 		}
-		if len(msg) < 16 {
-			continue
+		if !processFrame(msg, msgCh) {
+			return
 		}
-		packLen := int(binary.BigEndian.Uint32(msg[0:4]))
-		ver := binary.BigEndian.Uint16(msg[6:8])
-		op := binary.BigEndian.Uint32(msg[8:12])
-		bodyLen := packLen - 16
-		if bodyLen < 0 || bodyLen > 1024*1024 {
-			continue
+	}
+}
+
+// 一个 WebSocket 帧可能包含多个首尾相连的协议包。
+func processFrame(frame []byte, msgCh chan DanmakuMsg) bool {
+	for len(frame) >= 16 {
+		packLen := int(binary.BigEndian.Uint32(frame[0:4]))
+		headerLen := int(binary.BigEndian.Uint16(frame[4:6]))
+		if headerLen < 16 || packLen < headerLen || packLen > 1024*1024 || packLen > len(frame) {
+			log.Printf("[WS] invalid or truncated packet")
+			return true
 		}
-		if bodyLen > len(msg)-16 {
-			log.Printf("[WS] truncated packet")
-			continue
-		}
-		body := msg[16 : 16+bodyLen]
+		ver := binary.BigEndian.Uint16(frame[6:8])
+		op := binary.BigEndian.Uint32(frame[8:12])
+		body := frame[headerLen:packLen]
 		switch op {
 		case 5:
 			if ver == 3 {
@@ -153,17 +156,17 @@ func wsLoop(conn *websocket.Conn, msgCh chan DanmakuMsg, stop <-chan struct{}) {
 			var resp struct {
 				Code int `json:"code"`
 			}
-			json.Unmarshal(body, &resp)
-			log.Printf("[WS] auth reply code=%d", resp.Code)
-			if resp.Code != 0 {
-				return
+			if err := json.Unmarshal(body, &resp); err != nil || resp.Code != 0 {
+				log.Printf("[WS] auth failed or invalid reply")
+				return false
 			}
 		case 3:
-			// 心跳回复只代表连接可用，不能判断是否开播。
-		default:
-			// 静默忽略未知 op
+			// 心跳回复不代表直播间正在开播。
 		}
+		frame = frame[packLen:]
 	}
+	return true
+
 }
 
 func streamReadBrotli(compressed []byte, msgCh chan DanmakuMsg) {

@@ -77,3 +77,16 @@ func TestLiveEventsSetRoomState(t *testing.T) {
 		t.Fatal("PREPARING event not applied")
 	}
 }
+
+func TestProcessFrameReadsAllPackets(t *testing.T) {
+	messages := make(chan DanmakuMsg, 2)
+	a := makePacket(5, []byte(`{"cmd":"LIVE_OPEN_PLATFORM_DM","data":{"uid":1,"msg":"排队"}}`))
+	b := makePacket(5, []byte(`{"cmd":"SEND_GIFT","data":{"uid":2,"uname":"观众","giftName":"小花花","num":1}}`))
+	if !processFrame(append(a, b...), messages) {
+		t.Fatal("valid frame rejected")
+	}
+	first, second := <-messages, <-messages
+	if first.Content != "排队" || !second.IsGift || second.GiftName != "小花花" {
+		t.Fatalf("unexpected messages: %+v %+v", first, second)
+	}
+}
