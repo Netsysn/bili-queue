@@ -19,7 +19,7 @@ type Config struct {
 	PayMode        bool     `json:"pay_mode"`   // 付费模式：仅送礼可入队
 	GiftQueue      []string `json:"gift_queue"` // 付费模式下的有效礼物
 	FocusMode      bool     `json:"focus_mode"` // 专注模式：背景全透
-	Cookie         string   `json:"cookie"`      // B站 SESSDATA Cookie
+	Cookie         string   `json:"cookie"`     // B站 SESSDATA Cookie
 }
 
 var defaultConfig = Config{
@@ -71,8 +71,24 @@ func saveConfigLocked() error {
 	cfg.TimeoutMinutes = clamp(cfg.TimeoutMinutes, 1, 60)
 	cfg.WindowOpacity = clampFloat(cfg.WindowOpacity, 0.5, 1.0)
 
-	data, _ := json.MarshalIndent(cfg, "", "  ")
-	return os.WriteFile(cfgPath, data, 0644)
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(cfgPath), ".config-*")
+	if err != nil {
+		return err
+	}
+	name := tmp.Name()
+	defer os.Remove(name)
+	if _, err = tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err = tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(name, cfgPath)
 }
 
 // getConfig 返回配置副本。
@@ -84,9 +100,14 @@ func getConfig() Config {
 
 func updateConfig(fn func(*Config)) error {
 	cfgMu.Lock()
+	defer cfgMu.Unlock()
+	previous := cfg
 	fn(&cfg)
-	cfgMu.Unlock()
-	return saveConfig()
+	if err := saveConfigLocked(); err != nil {
+		cfg = previous
+		return err
+	}
+	return nil
 }
 
 func exeDir() string {

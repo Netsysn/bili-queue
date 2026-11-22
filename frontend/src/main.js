@@ -248,6 +248,7 @@ window.tagKey = (e, wrapId) => {
 // ── 设置 ──
 window.showSettings = async () => {
   document.getElementById('settingsModal').classList.remove('hidden');
+  document.getElementById('settingsError').textContent = '';
   try {
     const c = await Call.ByName(SVC + '.GetConfig');
     document.getElementById('cfgTheme').checked = c.theme === 'light';
@@ -304,9 +305,14 @@ window.saveSettings = async () => {
     servers: getTags('tagServers'),
     gift_queue: getTags('tagGifts'),
   };
-  await Call.ByName(SVC + '.SaveConfig', c);
-  hideSettings();
-  document.getElementById('statusText').textContent = '已保存，重启后生效';
+  const errorEl = document.getElementById('settingsError');
+  errorEl.textContent = '';
+  try {
+    const error = await Call.ByName(SVC + '.SaveConfig', c);
+    if (error) { errorEl.textContent = error; return; }
+    hideSettings();
+    document.getElementById('statusText').textContent = '已保存，重启后生效';
+  } catch (_) { errorEl.textContent = '保存失败，请检查程序目录是否可写'; }
 };
 
 // ── 初始化 ──

@@ -21,7 +21,7 @@ func initHTTPClient() {
 // 仅保存 SESSDATA，避免把用户输入的其他 Cookie 发送到意外的服务。
 func SetCookie(c string) {
 	value := strings.TrimSpace(c)
-	if strings.Contains(value, "=") {
+	if strings.Contains(value, ";") || strings.HasPrefix(strings.ToLower(value), "sessdata=") {
 		value = ""
 		for _, part := range strings.Split(c, ";") {
 			name, v, ok := strings.Cut(strings.TrimSpace(part), "=")

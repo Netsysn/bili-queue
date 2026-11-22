@@ -380,27 +380,25 @@ func (s *AppService) SetFocusMode(on bool) {
 	}
 }
 
-func (s *AppService) SaveConfig(c Config) {
-	updateConfig(func(cfg *Config) {
+func (s *AppService) SaveConfig(c Config) string {
+	err := updateConfig(func(cfg *Config) {
 		cfg.Theme = c.Theme
 		cfg.RoomID = c.RoomID
 		cfg.IdentityCode = c.IdentityCode
 		cfg.TimeoutMinutes = c.TimeoutMinutes
-		cfg.WindowOpacity = c.WindowOpacity
 		cfg.PayMode = c.PayMode
 		cfg.FocusMode = c.FocusMode
 		cfg.Cookie = c.Cookie
-		danmaku.SetCookie(c.Cookie)
-		if len(c.HelpTypes) > 0 {
-			cfg.HelpTypes = c.HelpTypes
-		}
-		if len(c.Servers) > 0 {
-			cfg.Servers = c.Servers
-		}
-		if len(c.GiftQueue) > 0 {
-			cfg.GiftQueue = c.GiftQueue
-		}
+		cfg.HelpTypes = c.HelpTypes
+		cfg.Servers = c.Servers
+		cfg.GiftQueue = c.GiftQueue
 	})
+	if err != nil {
+		log.Printf("保存设置失败: %v", err)
+		return "保存失败，请检查程序目录是否可写"
+	}
+	danmaku.SetCookie(c.Cookie)
+	return ""
 }
 
 func (s *AppService) buildUpdate() QueueUpdated {
