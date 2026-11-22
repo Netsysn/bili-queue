@@ -440,11 +440,11 @@ func parseDM(info []any) DanmakuMsg {
 
 func parseGift(raw json.RawMessage) DanmakuMsg {
 	var gd struct {
-		Uname    string `json:"uname"`
-		GiftName string `json:"giftName"`
-		Num      int    `json:"num"`
-		UID      int64  `json:"uid"`
-		TID      string `json:"tid"`
+		Uname    string          `json:"uname"`
+		GiftName string          `json:"giftName"`
+		Num      int             `json:"num"`
+		UID      int64           `json:"uid"`
+		TID      json.RawMessage `json:"tid"`
 	}
 	if json.Unmarshal(raw, &gd) != nil {
 		var str string
@@ -458,7 +458,7 @@ func parseGift(raw json.RawMessage) DanmakuMsg {
 	if gd.Num < 1 {
 		gd.Num = 1
 	}
-	return DanmakuMsg{UID: gd.UID, Username: gd.Uname, Content: fmt.Sprintf("送出 %s x%d", gd.GiftName, gd.Num), FromCurrent: true, IsGift: true, GiftName: gd.GiftName, GiftNum: gd.Num, EventID: giftEventID("ws", gd.TID)}
+	return DanmakuMsg{UID: gd.UID, Username: gd.Uname, Content: fmt.Sprintf("送出 %s x%d", gd.GiftName, gd.Num), FromCurrent: true, IsGift: true, GiftName: gd.GiftName, GiftNum: gd.Num, EventID: giftEventID("ws", eventIDString(gd.TID))}
 }
 
 // parseOpenDM 解析开放平台弹幕 LIVE_OPEN_PLATFORM_DM
@@ -483,13 +483,13 @@ func parseOpenDM(raw json.RawMessage) DanmakuMsg {
 // parseOpenGift 解析开放平台礼物 LIVE_OPEN_PLATFORM_SEND_GIFT / LIVE_OPEN_PLATFORM_GUARD
 func parseOpenGift(raw json.RawMessage) DanmakuMsg {
 	var d struct {
-		UID            int64  `json:"uid"`
-		Uname          string `json:"uname"`
-		GiftName       string `json:"gift_name"`
-		GiftNum        int    `json:"gift_num"`
-		MessageID      string `json:"msg_id"`
-		FansMedalLevel int    `json:"fans_medal_level"`
-		FansMedalName  string `json:"fans_medal_name"`
+		UID            int64           `json:"uid"`
+		Uname          string          `json:"uname"`
+		GiftName       string          `json:"gift_name"`
+		GiftNum        int             `json:"gift_num"`
+		MessageID      json.RawMessage `json:"msg_id"`
+		FansMedalLevel int             `json:"fans_medal_level"`
+		FansMedalName  string          `json:"fans_medal_name"`
 	}
 	if json.Unmarshal(raw, &d) != nil || d.GiftName == "" {
 		return DanmakuMsg{}
@@ -501,7 +501,23 @@ func parseOpenGift(raw json.RawMessage) DanmakuMsg {
 		UID: d.UID, Username: d.Uname,
 		Content:     fmt.Sprintf("送出 %s x%d", d.GiftName, d.GiftNum),
 		FromCurrent: true, IsGift: true, GiftName: d.GiftName, GiftNum: d.GiftNum,
-		EventID:   giftEventID("open", d.MessageID),
+		EventID:   giftEventID("open", eventIDString(d.MessageID)),
 		MedalName: d.FansMedalName, MedalLevel: d.FansMedalLevel,
 	}
+}
+
+// 平台的事件 ID 可能是字符串或数字，不应因类型变化丢失礼物。
+func eventIDString(raw json.RawMessage) string {
+	if len(raw) == 0 || string(raw) == "null" {
+		return ""
+	}
+	var value string
+	if json.Unmarshal(raw, &value) == nil {
+		return value
+	}
+	var number json.Number
+	if json.Unmarshal(raw, &number) == nil {
+		return number.String()
+	}
+	return ""
 }

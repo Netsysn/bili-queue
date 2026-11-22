@@ -274,7 +274,7 @@ func (s *AppService) processMsg(msg danmaku.DanmakuMsg) {
 	}
 	cfg := getConfig()
 	ht, sv, matched := "", "", false
-	if msg.FromCurrent && !cfg.PayMode {
+	if msg.FromCurrent && !cfg.PayMode && !s.manager.IsPaused() {
 		ht, sv, matched = intent.Match(msg.Content, cfg.HelpTypes, cfg.Servers)
 	}
 	if matched && sv == "" {

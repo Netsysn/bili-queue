@@ -50,3 +50,15 @@ func TestMakePacket(t *testing.T) {
 		t.Fatalf("invalid packet: %v", packet)
 	}
 }
+
+func TestParseGiftEventIDTypes(t *testing.T) {
+	for _, raw := range []string{
+		`{"uname":"viewer","uid":1,"giftName":"花","num":1,"tid":"123"}`,
+		`{"uname":"viewer","uid":1,"giftName":"花","num":1,"tid":123}`,
+	} {
+		msg := parseGift([]byte(raw))
+		if msg.GiftName != "花" || msg.EventID != "ws:123" {
+			t.Fatalf("gift lost or invalid: %+v", msg)
+		}
+	}
+}
