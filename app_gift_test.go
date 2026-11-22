@@ -17,3 +17,18 @@ func TestConfiguredGiftEntersQueue(t *testing.T) {
 		t.Fatalf("configured gift did not enter queue: %+v", entries)
 	}
 }
+
+func TestReplyTargetPreservedInLogsAndDoesNotTriggerQueue(t *testing.T) {
+	oldCfg := cfg
+	defer func() { cfg = oldCfg }()
+	cfg = defaultConfig
+	s := &AppService{manager: queue.New(nil, 5), stopCh: make(chan struct{}), avatarSlots: make(chan struct{}, 1)}
+	s.processMsg(danmaku.DanmakuMsg{UID: 837242, Username: "观众", Avatar: "provided", FromCurrent: true, ReplyTo: "帮帮", Content: "你好"})
+	update := s.buildUpdate()
+	if len(update.Queue) != 0 {
+		t.Fatal("reply target triggered queue")
+	}
+	if len(update.Logs) != 1 || update.Logs[0].ReplyTo != "帮帮" {
+		t.Fatalf("reply target missing from UI payload: %+v", update.Logs)
+	}
+}
